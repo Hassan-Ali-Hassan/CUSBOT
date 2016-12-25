@@ -6,6 +6,7 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "wifi.h"
 
+#define ACTIVATE_SLAVE_MOTOR_CONTROL 0
 class CUSBOT{
   
   public:
@@ -61,6 +62,9 @@ class CUSBOT{
   void control1();
   float omegaController(float error);
   float velocityController(float error);
+  void sendDirectlyToMotors();
+  void sendToSlaveMotorController();
+  void breakDownRPM(byte*,float);
 };
 
 

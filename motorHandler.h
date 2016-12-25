@@ -12,6 +12,7 @@ class motorHandler{
   motorHandler(int encAdd, int port);
   void controlRPM(float spreq);
   void updateRPM();
+  void updateRPM_filtered();
   void stop();
   void EF(); //stands for elementary filteration
   float getRPM();

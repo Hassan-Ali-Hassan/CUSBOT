@@ -113,7 +113,11 @@ void CUSBOT::control1()
 {
   float errorVelocity;
   float errorOmega;
-  
+  if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+  {
+    motorLeft.updateRPM_filtered();
+    motorRight.updateRPM_filtered();
+  }
   // collecting feedback data from sensors
   currentYawRate = -mpu.getRotationZ()/131 * PI/180.0; //the yaw rate in radians per seconds
   currentVelocity = (motorLeft.FilteredRPM + motorRight.FilteredRPM)*0.5 / 60.0 * 2 * PI * wheelRadius;
@@ -135,9 +139,42 @@ void CUSBOT::control1()
 
   RPMLeftReq = vLeftReq * 30.0 / (PI*wheelRadius);
   RPMRightReq = vRightReq * 30.0 / (PI*wheelRadius);
-  
+
+  if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+  {
+    sendToSlaveMotorController();
+  }
+  else
+  {
+    sendDirectlyToMotors();
+  } 
+}
+
+void CUSBOT::sendDirectlyToMotors()
+{
   motorLeft.controlRPM(RPMLeftReq);
   motorRight.controlRPM(RPMRightReq);
+}
+
+void CUSBOT::sendToSlaveMotorController()
+{
+  byte message[2] = {0,0};
+  
+  breakDownRPM(message,RPMLeftReq);
+  Wire.beginTransmission(6);
+  Wire.write(message,2);
+  Wire.endTransmission();
+
+  breakDownRPM(message,RPMRightReq);
+  Wire.beginTransmission(5);
+  Wire.write(message,2);
+  Wire.endTransmission();
+}
+
+void CUSBOT::breakDownRPM(byte* message,float value)
+{
+  message[1] = (int)value / 10;
+  message[0] = (int)(value - message[1] * 10);
 }
 
 void CUSBOT::controlBot(float linearVelocity,float angularVelocity)
@@ -157,6 +194,6 @@ void CUSBOT::controlBot()
   Serial.print(vReq);
   Serial.print("\t");
   Serial.println(omegaReq);
-//  control1();
+  control1();
 }
 

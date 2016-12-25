@@ -14,5 +14,5 @@ void setup()
 void loop()
 {
   Bot.controlBot();
-//  Bot.controlBot(0.7,0);
+//  Bot.controlBot(0.5,0);
 }

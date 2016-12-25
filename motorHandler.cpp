@@ -132,6 +132,23 @@ void motorHandler::updateRPM()
   RPM = (float)(message[0] + message[1] * 10);
 }
 
+void motorHandler::updateRPM_filtered()
+{
+  int i = 0;
+  byte message[2];
+  
+  Wire.requestFrom(encoderAddress,2);
+  while(Wire.available())
+  {
+    message[i] = Wire.read();
+    delay(10);
+    i++;
+  }  
+  RPM = (float)(message[0] + message[1] * 10);
+  FilteredRPM = rejectOutlier(RPM);
+}
+
+
 float motorHandler::mean(float* a,int n)
 {
   int i = 0;
@@ -324,7 +341,7 @@ void motorHandler::PID(float rpm, float requiredRPM)
   // PID part
   if(error < 20)
   {
-    PWMvalue = Kp * error * 0.4 + Ki * errorIntegral[1] * 0.7 + Kd * errorDifferential;
+    PWMvalue = Kp * error * 0.4 + Ki * errorIntegral[1] * 0.7 + Kd*0 * errorDifferential;
   }
   else
   {
