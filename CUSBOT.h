@@ -4,13 +4,16 @@
 #include "motorHandler.h"
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
+#include "wifi.h"
 
 class CUSBOT{
   
   public:
   CUSBOT(int,int,int,int,int,int); //constructor
   void controlBot(float linearVelocity,float angularVelocity); //controls linear and angular speeds
+  void controlBot();
   void IMU_init(); //or else, the code hangs. See implementation for more details
+  void WIFI_init();
   
   protected:
   // ....................................VARIABLES...........................//
@@ -21,11 +24,12 @@ class CUSBOT{
   int inB2;
   int EA;
   int EB;
-  int message[4];
+  
   // the objects on the rover
   motorHandler motorLeft;
   motorHandler motorRight;
   MPU6050 mpu;
+  wifi esp;
   
   //variables
   float vLeftReq;

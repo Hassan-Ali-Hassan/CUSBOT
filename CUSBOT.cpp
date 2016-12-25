@@ -33,6 +33,8 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   RPMRightReq = 0;
   interWheelLength = 0.18;
   wheelRadius = 0.0692*0.5;
+  vReq = 0;
+  omegaReq = 0;
   
   // variables initialization for velocity control function
   int i = 0;
@@ -63,6 +65,12 @@ void CUSBOT::IMU_init()
   //waiting indefinitely. So we start the wire library and then invoke this 
   //function to enable the IMU.
   mpu.initialize();
+}
+
+void CUSBOT::WIFI_init()
+{
+  //initializing the wifi module
+  esp.init();
 }
 
 float CUSBOT::velocityController(float error)
@@ -137,5 +145,18 @@ void CUSBOT::controlBot(float linearVelocity,float angularVelocity)
   vReq = linearVelocity;
   omegaReq = angularVelocity;
   control1();
+}
+
+void CUSBOT::controlBot()
+{
+  esp.update();
+  vReq = esp.messageI[1];
+  omegaReq = esp.messageI[0];
+  Serial.print(millis());
+  Serial.print("\t");
+  Serial.print(vReq);
+  Serial.print("\t");
+  Serial.println(omegaReq);
+//  control1();
 }
 
