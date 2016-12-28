@@ -329,7 +329,7 @@ void motorHandler::PID(float rpm, float requiredRPM)
   if(gainSchedulingOn)
   {
     voltage = (float)analogRead(A0) * 5.0 / 1023.0 * 3;
-    Kp = 15.0882 - 1.323*voltage;
+    Kp = 15.0882 - 1.2*voltage;
     Ki = 10.4117 - 1.176*voltage;
   }
   else
@@ -339,9 +339,9 @@ void motorHandler::PID(float rpm, float requiredRPM)
   }
   
   // PID part
-  if(error < 20)
+  if(abs(error) < 40)
   {
-    PWMvalue = Kp * error * 0.4 + Ki * errorIntegral[1] * 0.7 + Kd*0 * errorDifferential;
+    PWMvalue = Kp * error * 0.3 + Ki * errorIntegral[1] * 0.8 + Kd*0 * errorDifferential;
   }
   else
   {
@@ -350,6 +350,7 @@ void motorHandler::PID(float rpm, float requiredRPM)
   
   Serial.print(PWMvalue);
   Serial.print("\t");
+  Serial.println(rpm);
   if(PWMvalue > 255){PWMvalue = 255;}
   else if(PWMvalue < 0){PWMvalue = 0;}
   analogWrite(motorPort,PWMvalue);
@@ -407,14 +408,20 @@ void motorHandler::MIT(float rpm, float requiredRPM)
 
 void motorHandler::controlRPM(float speedRequired)
 {
-  int Ts = 10;
+  int Ts = 0;
   unsigned long time = millis();
-  if((time - oldTime) >= Ts)
+  
+  if(/*(time - oldTime) >= Ts*/ true)
   {
     updateRPM();
-//    FilteredRPM = RPM;
-    FilteredRPM = rejectOutlier(RPM);
+
+    // the next two lines are just for testing
+//    checkStop(RPM);
+    FilteredRPM = RPM;
+
+//    FilteredRPM = rejectOutlier(RPM);
 //    FilteredRPM = filterButter(RPM);
+
     oldTime = time;
 //    MIT(FilteredRPM,speedRequired);
     PID(FilteredRPM,speedRequired);

@@ -6,13 +6,14 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "wifi.h"
 
-#define ACTIVATE_SLAVE_MOTOR_CONTROL 0
+#define ACTIVATE_SLAVE_MOTOR_CONTROL 1
 class CUSBOT{
   
   public:
   CUSBOT(int,int,int,int,int,int); //constructor
   void controlBot(float linearVelocity,float angularVelocity); //controls linear and angular speeds
   void controlBot();
+  void openLoop(float);
   void IMU_init(); //or else, the code hangs. See implementation for more details
   void WIFI_init();
   
@@ -47,9 +48,11 @@ class CUSBOT{
   //variables for the velocity controller function
   float velocityErrorIntegral[2];
   float velocityErrorHistory[2];
+  float velocityErrorDifferential;
   float velTimeOldv;
   float Kpv;
   float Kiv;
+  float Kdv;
   
   //variables for the angular velocity controller function
   float omegaErrorIntegral[2];
@@ -63,6 +66,7 @@ class CUSBOT{
   float omegaController(float error);
   float velocityController(float error);
   void sendDirectlyToMotors();
+  void sendDirectlyToMotors(float,float);
   void sendToSlaveMotorController();
   void breakDownRPM(byte*,float);
 };

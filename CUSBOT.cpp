@@ -21,10 +21,12 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   digitalWrite(inB1,HIGH);
   digitalWrite(inB2,LOW);
   
-  motorLeft.setPID(5,1,0);
-  motorRight.setPID(5,1,0);
-  motorLeft.setGainScheduling(true);
-  motorRight.setGainScheduling(true);
+//  motorLeft.setPID(5,1,0);
+//  motorRight.setPID(5,1,0);
+  motorLeft.setPID(2,0.06,0.175);
+  motorRight.setPID(2,0.06,0.175);
+  motorLeft.setGainScheduling(false);
+  motorRight.setGainScheduling(false);
   
   // variables initializations
   vLeftReq = 0;
@@ -43,10 +45,11 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
     velocityErrorIntegral[i] = 0;
     velocityErrorHistory[i] = 0;    
   }
+  velocityErrorDifferential = 0;
   velTimeOldv = 0;
-  Kpv = 2.5;
-  Kiv = 6;
-  
+  Kpv = 2;
+  Kiv = 0.1;
+  Kdv = 0.5;
   //variables initialization for linear velocity control function
   for(i = 0; i < 2; i++)
   {
@@ -55,7 +58,7 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   }
   velTimeOldo = 0;
   Kpo = 2.5;
-  Kio = 6;
+  Kio = 2;
 }
 
 void CUSBOT::IMU_init()
@@ -77,17 +80,22 @@ float CUSBOT::velocityController(float error)
 {
   float time = (float)millis()/1000.0;
   float controlAction = 0;
-  
+  float dt = time - velTimeOldv;
   //integrating velocity
-  if(time - velTimeOldv > 0.02)
+  if( dt > 0.02)
   {
     velocityErrorHistory[1] = error;
     velocityErrorIntegral[1] = velocityErrorIntegral[0] + (velocityErrorHistory[1]+velocityErrorHistory[0])*0.5*(time-velTimeOldv);
     velTimeOldv = time;
+    velocityErrorDifferential = (velocityErrorHistory[1] - velocityErrorHistory[0])/dt;
     velocityErrorHistory[0] = velocityErrorHistory[1];
     velocityErrorIntegral[0] = velocityErrorIntegral[1];
   }
-  controlAction = error * Kpv + velocityErrorIntegral[1] * Kiv;
+  controlAction = error * Kpv + velocityErrorIntegral[1] * Kiv + velocityErrorDifferential*Kdv;
+//  Serial.print(error);
+//  Serial.print("\t");
+//  Serial.println(controlAction);
+//  controlAction = constrain(controlAction,0,1000);
   return controlAction;
 }
 
@@ -124,7 +132,6 @@ void CUSBOT::control1()
   
   // calculating errors
   errorOmega = (omegaReq - currentYawRate);
-//  errorVelocity = vReq; //this option is for open loop operation of the velocity
   errorVelocity = (vReq - currentVelocity);
   
   // Applying controllers on errors
@@ -134,12 +141,25 @@ void CUSBOT::control1()
   // calculating required RPMs from processed errors
   vLeftReq = errorVelocity + errorOmega * interWheelLength * 0.5;
   vRightReq = errorVelocity - errorOmega * interWheelLength * 0.5;
+
 //  vLeftReq = vReq + omegaReq * interWheelLength * 0.5; //this is for open loop operation
 //  vRightReq = vReq - omegaReq * interWheelLength * 0.5;
 
+//  vLeftReq = vReq + errorOmega * interWheelLength * 0.5; //this is for open loop velocity and closed loop omega
+//  vRightReq = vReq - errorOmega * interWheelLength * 0.5;
+
+//  vLeftReq = errorVelocity + omegaReq * interWheelLength * 0.5; //applying closed loop velocity only
+//  vRightReq = errorVelocity - omegaReq * interWheelLength * 0.5;
+
   RPMLeftReq = vLeftReq * 30.0 / (PI*wheelRadius);
   RPMRightReq = vRightReq * 30.0 / (PI*wheelRadius);
-
+  
+  RPMLeftReq = constrain(RPMLeftReq,0,1000);
+  RPMRightReq = constrain(RPMRightReq,0,1000);
+  Serial.print(RPMLeftReq);
+  Serial.print("\t");
+  Serial.println(RPMRightReq);
+  
   if(ACTIVATE_SLAVE_MOTOR_CONTROL)
   {
     sendToSlaveMotorController();
@@ -151,16 +171,30 @@ void CUSBOT::control1()
 }
 
 void CUSBOT::sendDirectlyToMotors()
-{
+{  
   motorLeft.controlRPM(RPMLeftReq);
   motorRight.controlRPM(RPMRightReq);
+}
+
+void CUSBOT::sendDirectlyToMotors(float a, float b)
+{
+  motorLeft.controlRPM(a);
+  motorRight.controlRPM(b);
 }
 
 void CUSBOT::sendToSlaveMotorController()
 {
   byte message[2] = {0,0};
-  
+//  RPMLeftReq=127;
+//  RPMRightReq=127;
   breakDownRPM(message,RPMLeftReq);
+//  Serial.print("breaking message\t");
+//  Serial.print(RPMLeftReq);
+//  Serial.print("\t");
+//  Serial.print(message[0]);
+//  Serial.print("\t");
+//  Serial.print(message[1]);
+//  Serial.println("\t");
   Wire.beginTransmission(6);
   Wire.write(message,2);
   Wire.endTransmission();
@@ -184,16 +218,44 @@ void CUSBOT::controlBot(float linearVelocity,float angularVelocity)
   control1();
 }
 
-void CUSBOT::controlBot()
+void CUSBOT::openLoop(float rpm)
 {
+  sendDirectlyToMotors(rpm,rpm);
+}
+void CUSBOT::controlBot() 
+{
+  /*this function receives intructions sent through mqtt to move in 
+  diferent directions and change its speed. Now if vReq = 0, this means
+  that the robot is required to stop. In this case, there is no need to 
+  call the control1 function, and instead all the integration values for 
+  controllers are set to zero.*/
   esp.update();
   vReq = esp.messageI[1];
   omegaReq = esp.messageI[0];
-  Serial.print(millis());
-  Serial.print("\t");
-  Serial.print(vReq);
-  Serial.print("\t");
-  Serial.println(omegaReq);
-  control1();
+//  Serial.print(millis());
+//  Serial.print("\t");
+//  Serial.print(vReq);
+//  Serial.print("\t");
+//  Serial.println(omegaReq);
+  if(vReq != 0)
+  {   
+    control1();
+  }
+  else
+  {
+    for(int i = 0; i < 2; i++)
+    {
+      velocityErrorIntegral[i] = 0;
+      velocityErrorHistory[i] = 0;    
+    }
+    for(int i = 0; i < 2; i++)
+    {
+      omegaErrorIntegral[i] = 0;
+      omegaErrorHistory[i] = 0;
+    }
+    motorRight.stop();
+    motorLeft.stop();
+  } 
+//  control1();
 }
 
