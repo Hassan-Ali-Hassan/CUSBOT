@@ -7,6 +7,7 @@
 #include "wifi.h"
 
 #define ACTIVATE_SLAVE_MOTOR_CONTROL 1
+#define ACTIVATE_ANGLE_CONTROL 1
 class CUSBOT{
   
   public:
@@ -47,6 +48,10 @@ class CUSBOT{
   float currentVelocity;
   float vReq;
   float omegaReq;
+
+  // some IMU related variables
+  boolean IMU_ok_flag;
+  int biasedHeading;
   
   //variables for the velocity controller function
   float velocityErrorIntegral[2];
@@ -65,15 +70,29 @@ class CUSBOT{
   float Kpo;
   float Kio;
   float Kdo;
+
+  //variables for the heading angle controller function
+  int old_yaw;
+  int current_heading;
+  float headingErrorIntegral[2];
+  float headingErrorHistory[2];
+  float headingErrorDifferential;
+  float velTimeOldh;
+  float Kph; //h for heading
+  float Kih;
+  float Kdh;
   
   //.....................................FUNCTIONS................................//
   void control1();
-  float omegaController(float error);
-  float velocityController(float error);
+  void control2();
+  float omegaController();
+  float velocityController();
+  float headingController(float);
   void sendDirectlyToMotors();
   void sendDirectlyToMotors(float,float);
   void sendToSlaveMotorController();
   void breakDownRPM(byte*,float);
+  void IMU_settle();
 };
 
 

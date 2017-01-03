@@ -47,23 +47,24 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   }
   velocityErrorDifferential = 0;
   velTimeOldv = 0;
-  Kpv = 0.06;
-  Kiv = 2.6;
-  Kdv = 0;
-  //variables initialization for linear velocity control function
+  
+  //variables initialization for angular velocity control function
   for(i = 0; i < 2; i++)
   {
     omegaErrorIntegral[i] = 0;
     omegaErrorHistory[i] = 0;
   }
+  omegaErrorDifferential = 0;
   velTimeOldo = 0;
-//  Kpo = 0.056; //these are working values for proto 3.2
-//  Kio = 2.3;
-  Kpo = 1.056; //these are working values for proto 3.1
-  Kio = 0;
-//  Kpo = 0.1; //these are working values for proto 3.2
-//  Kio = 5;
-  Kdo = 0;
+
+  //variables initialization for heading angle control function
+  for(i = 0; i < 2; i++)
+  {
+    headingErrorIntegral[i] = 0;
+    headingErrorHistory[i] = 0;
+  }
+  headingErrorDifferential = 0;
+  velTimeOldh = 0;
 }
 
 void CUSBOT::IMU_init()
@@ -72,8 +73,52 @@ void CUSBOT::IMU_init()
   //connect to the IMU without enabling the wire library so it hangs and keeps
   //waiting indefinitely. So we start the wire library and then invoke this 
   //function to enable the IMU.
-  mpu.initialize();
+  if(ACTIVATE_ANGLE_CONTROL)
+  {
+    mpu.start();
+    IMU_settle();
+  }
+  else
+  {
+    mpu.initialize();
+  }
 }
+
+void CUSBOT::IMU_settle()
+{
+  // mpu.start();
+  int new_yaw = 0;
+  int number_of_repeatings = 0;
+  boolean yaw_settled = false;
+  IMU_ok_flag = false;
+  
+  while(!yaw_settled && !IMU_ok_flag)
+  {
+    new_yaw = mpu.get_yaw();
+    Serial.println(new_yaw);
+    if(new_yaw == old_yaw)
+    {
+      number_of_repeatings++; //here, we count how many times a certain reading is repaeated in the transient state of the sensor till it settles 
+    }
+    else
+    {
+      number_of_repeatings = 0;
+    }
+    old_yaw = new_yaw; //handing the value of new_yaw to old_yaw so we can see if we converge in the next loop or not
+  
+          
+    if (number_of_repeatings >= 30 && !yaw_settled) //this means that the readings are settled enough
+    {
+      yaw_settled = true;
+      biasedHeading = new_yaw;
+      digitalWrite(13,HIGH);
+      Serial.println("OK");
+    }
+  }
+  IMU_ok_flag = true;
+//  return true;
+}
+
 
 void CUSBOT::WIFI_init()
 {
@@ -81,69 +126,174 @@ void CUSBOT::WIFI_init()
   esp.init();
 }
 
-float CUSBOT::velocityController(float error)
+float CUSBOT::velocityController()
 {
   float time = (float)millis()/1000.0;
   float controlAction = 0;
   float dt = time - velTimeOldv;
-  //integrating velocity
-  if( dt > 0.02)
-  {
-    velocityErrorHistory[1] = error;
-    velocityErrorIntegral[1] = velocityErrorIntegral[0] + (velocityErrorHistory[1]+velocityErrorHistory[0])*0.5*(time-velTimeOldv);
-    velTimeOldv = time;
-    velocityErrorDifferential = (velocityErrorHistory[1] - velocityErrorHistory[0])/dt;
-    velocityErrorHistory[0] = velocityErrorHistory[1];
-    velocityErrorIntegral[0] = velocityErrorIntegral[1];
-  }
-  controlAction = error * Kpv + velocityErrorIntegral[1] * Kiv + velocityErrorDifferential*Kdv;
-//  Serial.print(error);
-//  Serial.print("\t");
-//  Serial.println(controlAction);
-//  controlAction = constrain(controlAction,0,1000);
-  return controlAction;
-}
-
-float CUSBOT::omegaController(float error)
-{
-  float time = (float)millis()/1000.0;
-  float controlAction = 0;
-  float dt = time - velTimeOldo;
-  //integrating omega
-  if(dt > 0.02)
-  {
-    omegaErrorHistory[1] = error;
-    omegaErrorIntegral[1] = omegaErrorIntegral[0] + (omegaErrorHistory[1]+omegaErrorHistory[0])*0.5*(time-velTimeOldo);
-    velTimeOldo = time;
-    omegaErrorDifferential = (omegaErrorHistory[1] -omegaErrorHistory[0])/dt;
-    omegaErrorHistory[0] = omegaErrorHistory[1];
-    omegaErrorIntegral[0] = omegaErrorIntegral[1];
-  }
-  controlAction = error * Kpo + omegaErrorIntegral[1] * Kio + Kdo * omegaErrorDifferential;
-  return controlAction;
-}
-
-void CUSBOT::control1()
-{
-  float errorVelocity;
-  float errorOmega;
+  float error = 0;
+  
+  //Setting controller gains
+  Kpv = 0.06;
+  Kiv = 2.6;
+  Kdv = 0;
+  
+  //collecting sensor data
   if(ACTIVATE_SLAVE_MOTOR_CONTROL)
   {
     motorLeft.updateRPM_filtered();
     motorRight.updateRPM_filtered();
   }
+  currentVelocity = (motorLeft.FilteredRPM + motorRight.FilteredRPM)*0.5 / 60.0 * 2 * PI * wheelRadius;
+
+  //calculating error
+  error = (vReq - currentVelocity);
+  
+  //integrating velocity
+  if(dt > 0.02 && dt < 3)
+  {
+    velocityErrorHistory[1] = error;
+    velocityErrorIntegral[1] = velocityErrorIntegral[0] + (velocityErrorHistory[1]+velocityErrorHistory[0])*0.5*(time-velTimeOldv);
+    velocityErrorDifferential = (velocityErrorHistory[1] - velocityErrorHistory[0])/dt;
+    velTimeOldv = time;
+    velocityErrorHistory[0] = velocityErrorHistory[1];
+    velocityErrorIntegral[0] = velocityErrorIntegral[1];
+  }
+  else
+  {
+    velTimeOldv = time;
+  }
+  controlAction = error * Kpv + velocityErrorIntegral[1] * Kiv + velocityErrorDifferential*Kdv;
+  return controlAction;
+}
+
+float CUSBOT::omegaController()
+{
+  float time = (float)millis()/1000.0;
+  float controlAction = 0;
+  float dt = time - velTimeOldo;
+  float error = 0;
+
+  // ........Setting the controller gains.........//
+//  Kpo = 0.056; //these are working values for proto 3.2
+//  Kio = 2.3;
+//  Kpo = 1.056; //these are working values for proto 3.1
+//  Kio = 0;
+  Kpo = 0.1; //these are working values for proto 3.2
+  Kio = 5;
+  Kdo = 0;
+  
   // collecting feedback data from sensors
   currentYawRate = -mpu.getRotationZ()/131 * PI/180.0; //the yaw rate in radians per seconds
-//  if(abs(currentYawRate)<0.05)currentYawRate=0; //a condition to zero out some residues
-  currentVelocity = (motorLeft.FilteredRPM + motorRight.FilteredRPM)*0.5 / 60.0 * 2 * PI * wheelRadius;
-  
   // calculating errors
-  errorOmega = (omegaReq - currentYawRate);
-  errorVelocity = (vReq - currentVelocity);
+  error = (omegaReq - currentYawRate);
+    
+  //integrating omega
+  //when the IMU initializes its DMP it takes time (about 15 seconds). Normally, the dt would 
+  //be very large after initializing the IMU so the error integration value would be very large 
+  //which will easily saturate the motors. 
+  //This condition makes sure that dt is greater than the min sampling time, and also makes sure
+  //it doesn't exceed a plausible limit, so the initial great dt after DMP initialization would be
+  //detected. If dt is too big, velTimeOldo is set to be equal to current time without carrying out 
+  //integration, so in the next loop dt will be plausible.
+  if(dt > 0.02 && dt < 3)
+  {
+    omegaErrorHistory[1] = error;
+    omegaErrorIntegral[1] = omegaErrorIntegral[0] + (omegaErrorHistory[1]+omegaErrorHistory[0])*0.5*(time-velTimeOldo);
+    omegaErrorDifferential = (omegaErrorHistory[1] -omegaErrorHistory[0])/dt;
+    velTimeOldo = time;
+    Serial.println("hi man");
+    omegaErrorHistory[0] = omegaErrorHistory[1];
+    omegaErrorIntegral[0] = omegaErrorIntegral[1];
+  }
+  else
+  {
+    velTimeOldo = time;
+  }
+  controlAction = error * Kpo + omegaErrorIntegral[1] * Kio + Kdo * omegaErrorDifferential;
+  return controlAction;
+}
+
+float CUSBOT::headingController(float desiredHeading)
+{
+  float time = (float)millis()/1000.0;
+  float controlAction = 0;
+  float dt = time - velTimeOldh;
+  float error = 0;
+  int complementary_error = 0;
+  int new_yaw = mpu.get_yaw();
+
+  // making some operations on the obtained yaw reading to make sure it is useful and sound
+  if(new_yaw < 0)
+  {
+    new_yaw += 360;
+  }
+  if(abs(new_yaw - old_yaw) < 20) //this is to make sure that when the new_yaw is rotated to be 360 for example, it flips to 1 and then we have 360 -1 added to current yaw for example
+  {
+    current_heading += (new_yaw - old_yaw);
+    old_yaw = new_yaw; 
+  }
+  else
+  {
+    old_yaw = new_yaw; 
+  }
+  
+  //this condition to make sure that the current heading is bounded between -180 and 180
+  if(current_heading > 180)
+  {
+    current_heading -= 360;
+  }
+  else if(current_heading < -180)
+  {
+    current_heading += 360;
+  }
+  
+  //this part is to make sure that the rover will rotate to the required heading from the shortest possible direction.
+  error = (float)(desiredHeading - current_heading);
+  if (error > 0)
+  {
+    complementary_error = error - 360; //calculating the complement of the error
+  }
+  else
+  {
+    complementary_error = error + 360;
+  }
+  
+  if(abs(error) < abs(complementary_error))
+  {
+    error = error;
+  }
+  else
+  {
+    error = complementary_error;
+  }
+
+  // now that we have the error (and it is plausible and sound), we use it to generate the control action
+  Kph = 1; //h for heading
+  Kih = 2;
+  Kdh = 0;
+  error *= PI/180.0; //before this operation we had the error in deg, but now we need to be in rad, because the control action has to be per radians/sec, for units consistency when calculating left and right wheel velocities.
+  if(dt > 0.02)
+  {
+    headingErrorHistory[1] = error;
+    headingErrorIntegral[1] = headingErrorIntegral[0] + (headingErrorHistory[1]+headingErrorHistory[0])*0.5*(time-velTimeOldh);
+    headingErrorDifferential = (headingErrorHistory[1] -headingErrorHistory[0])/dt;
+    headingErrorHistory[0] = headingErrorHistory[1];
+    headingErrorIntegral[0] = headingErrorIntegral[1];
+  }
+  velTimeOldh = time;
+  controlAction = error * Kph + headingErrorIntegral[1] * Kih + Kdh * headingErrorDifferential;
+  return controlAction;
+}
+
+void CUSBOT::control1() //this function invokes the neccessary functions to control linear and angular speeds
+{
+  float errorVelocity;
+  float errorOmega;
   
   // Applying controllers on errors
-  errorOmega = omegaController(errorOmega);
-  errorVelocity = velocityController(errorVelocity);
+  errorOmega = omegaController();
+  errorVelocity = velocityController();
   
   // calculating required RPMs from processed errors
   vLeftReq = errorVelocity + errorOmega * interWheelLength*0.5;
@@ -163,11 +313,41 @@ void CUSBOT::control1()
   
   RPMLeftReq = constrain(RPMLeftReq,0,1000);
   RPMRightReq = constrain(RPMRightReq,0,1000);
-  Serial.print(millis());
-  Serial.print("\t");
-  Serial.print(vReq);
-  Serial.print("\t");
-  Serial.println(omegaReq);
+//  Serial.print(millis());
+//  Serial.print("\t");
+//  Serial.print(vReq);
+//  Serial.print("\t");
+//  Serial.println(omegaReq);
+  
+  if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+  {
+    sendToSlaveMotorController();
+  }
+  else
+  {
+    sendDirectlyToMotors();
+  } 
+}
+
+void CUSBOT::control2()
+{
+  float errorVelocity;
+  float errorHeading;
+  
+  // Applying controllers on errors
+  errorHeading = headingController(10);
+  errorVelocity = velocityController();
+  
+  // calculating required RPMs from processed errors
+  vLeftReq = errorVelocity + errorHeading * interWheelLength*0.5;
+  vRightReq = errorVelocity - errorHeading * interWheelLength*0.5;
+
+  RPMLeftReq = vLeftReq * 30.0 / (PI*wheelRadius);
+  RPMRightReq = vRightReq * 30.0 / (PI*wheelRadius);
+  
+  RPMLeftReq = constrain(RPMLeftReq,0,1000);
+  RPMRightReq = constrain(RPMRightReq,0,1000);
+  
   
   if(ACTIVATE_SLAVE_MOTOR_CONTROL)
   {
