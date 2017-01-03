@@ -12,10 +12,13 @@ class CUSBOT{
   public:
   CUSBOT(int,int,int,int,int,int); //constructor
   void controlBot(float linearVelocity,float angularVelocity); //controls linear and angular speeds
-  void controlBot();
-  void openLoop(float);
   void IMU_init(); //or else, the code hangs. See implementation for more details
   void WIFI_init();
+
+  // functions for testing purposes
+  void controlBot();
+  void openLoop(float);
+  void openLoopSlave(float);
   
   protected:
   // ....................................VARIABLES...........................//
@@ -57,9 +60,11 @@ class CUSBOT{
   //variables for the angular velocity controller function
   float omegaErrorIntegral[2];
   float omegaErrorHistory[2];
+  float omegaErrorDifferential;
   float velTimeOldo;
   float Kpo;
   float Kio;
+  float Kdo;
   
   //.....................................FUNCTIONS................................//
   void control1();

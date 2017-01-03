@@ -47,9 +47,9 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   }
   velocityErrorDifferential = 0;
   velTimeOldv = 0;
-  Kpv = 2;
-  Kiv = 0.1;
-  Kdv = 0.5;
+  Kpv = 0.06;
+  Kiv = 2.6;
+  Kdv = 0;
   //variables initialization for linear velocity control function
   for(i = 0; i < 2; i++)
   {
@@ -57,8 +57,13 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
     omegaErrorHistory[i] = 0;
   }
   velTimeOldo = 0;
-  Kpo = 2.5;
-  Kio = 2;
+//  Kpo = 0.056; //these are working values for proto 3.2
+//  Kio = 2.3;
+  Kpo = 1.056; //these are working values for proto 3.1
+  Kio = 0;
+//  Kpo = 0.1; //these are working values for proto 3.2
+//  Kio = 5;
+  Kdo = 0;
 }
 
 void CUSBOT::IMU_init()
@@ -103,17 +108,18 @@ float CUSBOT::omegaController(float error)
 {
   float time = (float)millis()/1000.0;
   float controlAction = 0;
-  
+  float dt = time - velTimeOldo;
   //integrating omega
-  if(time - velTimeOldo > 0.02)
+  if(dt > 0.02)
   {
     omegaErrorHistory[1] = error;
     omegaErrorIntegral[1] = omegaErrorIntegral[0] + (omegaErrorHistory[1]+omegaErrorHistory[0])*0.5*(time-velTimeOldo);
     velTimeOldo = time;
+    omegaErrorDifferential = (omegaErrorHistory[1] -omegaErrorHistory[0])/dt;
     omegaErrorHistory[0] = omegaErrorHistory[1];
     omegaErrorIntegral[0] = omegaErrorIntegral[1];
   }
-  controlAction = error * Kpo + omegaErrorIntegral[1] * Kio;
+  controlAction = error * Kpo + omegaErrorIntegral[1] * Kio + Kdo * omegaErrorDifferential;
   return controlAction;
 }
 
@@ -128,6 +134,7 @@ void CUSBOT::control1()
   }
   // collecting feedback data from sensors
   currentYawRate = -mpu.getRotationZ()/131 * PI/180.0; //the yaw rate in radians per seconds
+//  if(abs(currentYawRate)<0.05)currentYawRate=0; //a condition to zero out some residues
   currentVelocity = (motorLeft.FilteredRPM + motorRight.FilteredRPM)*0.5 / 60.0 * 2 * PI * wheelRadius;
   
   // calculating errors
@@ -139,8 +146,8 @@ void CUSBOT::control1()
   errorVelocity = velocityController(errorVelocity);
   
   // calculating required RPMs from processed errors
-  vLeftReq = errorVelocity + errorOmega * interWheelLength * 0.5;
-  vRightReq = errorVelocity - errorOmega * interWheelLength * 0.5;
+  vLeftReq = errorVelocity + errorOmega * interWheelLength*0.5;
+  vRightReq = errorVelocity - errorOmega * interWheelLength*0.5;
 
 //  vLeftReq = vReq + omegaReq * interWheelLength * 0.5; //this is for open loop operation
 //  vRightReq = vReq - omegaReq * interWheelLength * 0.5;
@@ -156,9 +163,11 @@ void CUSBOT::control1()
   
   RPMLeftReq = constrain(RPMLeftReq,0,1000);
   RPMRightReq = constrain(RPMRightReq,0,1000);
-  Serial.print(RPMLeftReq);
+  Serial.print(millis());
   Serial.print("\t");
-  Serial.println(RPMRightReq);
+  Serial.print(vReq);
+  Serial.print("\t");
+  Serial.println(omegaReq);
   
   if(ACTIVATE_SLAVE_MOTOR_CONTROL)
   {
@@ -184,9 +193,7 @@ void CUSBOT::sendDirectlyToMotors(float a, float b)
 
 void CUSBOT::sendToSlaveMotorController()
 {
-  byte message[2] = {0,0};
-//  RPMLeftReq=127;
-//  RPMRightReq=127;
+  byte message[3] = {0,0,0};
   breakDownRPM(message,RPMLeftReq);
 //  Serial.print("breaking message\t");
 //  Serial.print(RPMLeftReq);
@@ -196,17 +203,26 @@ void CUSBOT::sendToSlaveMotorController()
 //  Serial.print(message[1]);
 //  Serial.println("\t");
   Wire.beginTransmission(6);
-  Wire.write(message,2);
+  Wire.write(message,3);
   Wire.endTransmission();
 
   breakDownRPM(message,RPMRightReq);
   Wire.beginTransmission(5);
-  Wire.write(message,2);
+  Wire.write(message,3);
   Wire.endTransmission();
 }
 
 void CUSBOT::breakDownRPM(byte* message,float value)
 {
+  if(value < 0)
+  {
+    message[2] = 1;
+  }
+  else
+  {
+    message[2] = 0;
+  }
+  value = abs(value);
   message[1] = (int)value / 10;
   message[0] = (int)(value - message[1] * 10);
 }
@@ -222,6 +238,25 @@ void CUSBOT::openLoop(float rpm)
 {
   sendDirectlyToMotors(rpm,rpm);
 }
+
+void CUSBOT::openLoopSlave(float rpm)
+{
+  RPMLeftReq = rpm;
+  RPMRightReq = rpm;
+  sendToSlaveMotorController();
+  if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+  {
+    motorLeft.updateRPM_filtered();
+    motorRight.updateRPM_filtered();
+  }
+  Serial.print(millis());
+  Serial.print("\t");
+  Serial.print(motorLeft.FilteredRPM);
+  Serial.print("\t");
+  Serial.print(motorRight.FilteredRPM);
+  Serial.println("\t");
+}
+
 void CUSBOT::controlBot() 
 {
   /*this function receives intructions sent through mqtt to move in 
@@ -237,25 +272,25 @@ void CUSBOT::controlBot()
 //  Serial.print(vReq);
 //  Serial.print("\t");
 //  Serial.println(omegaReq);
-  if(vReq != 0)
-  {   
-    control1();
-  }
-  else
-  {
-    for(int i = 0; i < 2; i++)
-    {
-      velocityErrorIntegral[i] = 0;
-      velocityErrorHistory[i] = 0;    
-    }
-    for(int i = 0; i < 2; i++)
-    {
-      omegaErrorIntegral[i] = 0;
-      omegaErrorHistory[i] = 0;
-    }
-    motorRight.stop();
-    motorLeft.stop();
-  } 
-//  control1();
+//  if(vReq != 0)
+//  {   
+//    control1();
+//  }
+//  else
+//  {
+//    for(int i = 0; i < 2; i++)
+//    {
+//      velocityErrorIntegral[i] = 0;
+//      velocityErrorHistory[i] = 0;    
+//    }
+//    for(int i = 0; i < 2; i++)
+//    {
+//      omegaErrorIntegral[i] = 0;
+//      omegaErrorHistory[i] = 0;
+//    }
+//    motorRight.stop();
+//    motorLeft.stop();
+//  } 
+  control1();
 }
 
