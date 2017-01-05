@@ -269,19 +269,23 @@ float CUSBOT::headingController(float desiredHeading)
   }
 
   // now that we have the error (and it is plausible and sound), we use it to generate the control action
-  Kph = 1; //h for heading
-  Kih = 2;
-  Kdh = 0;
+  Kph = 5; //h for heading
+  Kih = 0.1;
+  Kdh = 0.5;
   error *= PI/180.0; //before this operation we had the error in deg, but now we need to be in rad, because the control action has to be per radians/sec, for units consistency when calculating left and right wheel velocities.
-  if(dt > 0.02)
+  if(dt > 0.02 && dt < 3)
   {
     headingErrorHistory[1] = error;
     headingErrorIntegral[1] = headingErrorIntegral[0] + (headingErrorHistory[1]+headingErrorHistory[0])*0.5*(time-velTimeOldh);
     headingErrorDifferential = (headingErrorHistory[1] -headingErrorHistory[0])/dt;
+    velTimeOldh = time;
     headingErrorHistory[0] = headingErrorHistory[1];
     headingErrorIntegral[0] = headingErrorIntegral[1];
   }
-  velTimeOldh = time;
+  else
+  {
+    velTimeOldh = time;
+  }
   controlAction = error * Kph + headingErrorIntegral[1] * Kih + Kdh * headingErrorDifferential;
   return controlAction;
 }
@@ -329,13 +333,13 @@ void CUSBOT::control1() //this function invokes the neccessary functions to cont
   } 
 }
 
-void CUSBOT::control2()
+void CUSBOT::control2(float desiredHeading)
 {
   float errorVelocity;
   float errorHeading;
   
   // Applying controllers on errors
-  errorHeading = headingController(10);
+  errorHeading = headingController(desiredHeading);
   errorVelocity = velocityController();
   
   // calculating required RPMs from processed errors
@@ -411,7 +415,8 @@ void CUSBOT::controlBot(float linearVelocity,float angularVelocity)
 {
   vReq = linearVelocity;
   omegaReq = angularVelocity;
-  control1();
+//  control1();
+  control2(0);
 }
 
 void CUSBOT::openLoop(float rpm)
@@ -471,6 +476,7 @@ void CUSBOT::controlBot()
 //    motorRight.stop();
 //    motorLeft.stop();
 //  } 
-  control1();
+//  control1();
+  control2(esp.messageI[0]*100);
 }
 

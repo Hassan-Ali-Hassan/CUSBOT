@@ -84,7 +84,7 @@ class CUSBOT{
   
   //.....................................FUNCTIONS................................//
   void control1();
-  void control2();
+  void control2(float);
   float omegaController();
   float velocityController();
   float headingController(float);

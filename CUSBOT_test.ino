@@ -14,8 +14,8 @@ void setup()
 
 void loop()
 {
-//  Bot.controlBot();
-  Bot.controlBot(0.7,0.0); //for now, you have to multiply omega by 0.7 for correct performance
+  Bot.controlBot();
+//  Bot.controlBot(0.7,0.0); //for now, you have to multiply omega by 0.7 for correct performance
 //  Bot.openLoop(200.0);
 //Bot.openLoopSlave(230);
 }
