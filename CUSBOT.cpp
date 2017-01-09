@@ -37,6 +37,7 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   wheelRadius = 0.0692*0.5;
   vReq = 0;
   omegaReq = 0;
+  headingReq = 0;
   
   // variables initialization for velocity control function
   int i = 0;
@@ -163,6 +164,11 @@ float CUSBOT::velocityController()
   {
     velTimeOldv = time;
   }
+  Serial.print(millis());
+  Serial.print("\t");
+  Serial.print(motorLeft.FilteredRPM);
+  Serial.print("\t");
+  Serial.println(motorRight.FilteredRPM);
   controlAction = error * Kpv + velocityErrorIntegral[1] * Kiv + velocityErrorDifferential*Kdv;
   return controlAction;
 }
@@ -214,7 +220,7 @@ float CUSBOT::omegaController()
   return controlAction;
 }
 
-float CUSBOT::headingController(float desiredHeading)
+float CUSBOT::headingController()
 {
   float time = (float)millis()/1000.0;
   float controlAction = 0;
@@ -249,7 +255,7 @@ float CUSBOT::headingController(float desiredHeading)
   }
   
   //this part is to make sure that the rover will rotate to the required heading from the shortest possible direction.
-  error = (float)(desiredHeading - current_heading);
+  error = (float)(headingReq - current_heading);
   if (error > 0)
   {
     complementary_error = error - 360; //calculating the complement of the error
@@ -272,6 +278,9 @@ float CUSBOT::headingController(float desiredHeading)
   Kph = 5; //h for heading
   Kih = 0.1;
   Kdh = 0.5;
+//  Kph = 10; //h for heading
+//  Kih = 2;
+//  Kdh = 0;
   error *= PI/180.0; //before this operation we had the error in deg, but now we need to be in rad, because the control action has to be per radians/sec, for units consistency when calculating left and right wheel velocities.
   if(dt > 0.02 && dt < 3)
   {
@@ -333,18 +342,20 @@ void CUSBOT::control1() //this function invokes the neccessary functions to cont
   } 
 }
 
-void CUSBOT::control2(float desiredHeading)
+void CUSBOT::control2()
 {
   float errorVelocity;
   float errorHeading;
   
   // Applying controllers on errors
-  errorHeading = headingController(desiredHeading);
+  errorHeading = headingController();
   errorVelocity = velocityController();
   
-  // calculating required RPMs from processed errors
-  vLeftReq = errorVelocity + errorHeading * interWheelLength*0.5;
-  vRightReq = errorVelocity - errorHeading * interWheelLength*0.5;
+//  // calculating required RPMs from processed errors
+//  vLeftReq = errorVelocity + errorHeading * interWheelLength*0.5;
+//  vRightReq = errorVelocity - errorHeading * interWheelLength*0.5;
+  vLeftReq = vReq + errorHeading * interWheelLength*0.5;
+  vRightReq = vReq - errorHeading * interWheelLength*0.5;
 
   RPMLeftReq = vLeftReq * 30.0 / (PI*wheelRadius);
   RPMRightReq = vRightReq * 30.0 / (PI*wheelRadius);
@@ -411,12 +422,19 @@ void CUSBOT::breakDownRPM(byte* message,float value)
   message[0] = (int)(value - message[1] * 10);
 }
 
-void CUSBOT::controlBot(float linearVelocity,float angularVelocity)
+void CUSBOT::controlBot(float linearVelocity,float value, char MODE)
 {
   vReq = linearVelocity;
-  omegaReq = angularVelocity;
-//  control1();
-  control2(0);
+  if(MODE == 'o') //which stands for omega
+  {
+    omegaReq = value;
+    control1();
+  }
+  else if(MODE == 'h') //which stands for heading
+  {
+    headingReq = value;
+    control2();
+  }
 }
 
 void CUSBOT::openLoop(float rpm)
@@ -477,6 +495,6 @@ void CUSBOT::controlBot()
 //    motorLeft.stop();
 //  } 
 //  control1();
-  control2(esp.messageI[0]*100);
+  control2();
 }
 

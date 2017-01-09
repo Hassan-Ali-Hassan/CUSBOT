@@ -12,7 +12,7 @@ class CUSBOT{
   
   public:
   CUSBOT(int,int,int,int,int,int); //constructor
-  void controlBot(float linearVelocity,float angularVelocity); //controls linear and angular speeds
+  void controlBot(float,float,char); //controls linear and angular speeds
   void IMU_init(); //or else, the code hangs. See implementation for more details
   void WIFI_init();
 
@@ -48,7 +48,8 @@ class CUSBOT{
   float currentVelocity;
   float vReq;
   float omegaReq;
-
+  float headingReq;
+  
   // some IMU related variables
   boolean IMU_ok_flag;
   int biasedHeading;
@@ -84,10 +85,10 @@ class CUSBOT{
   
   //.....................................FUNCTIONS................................//
   void control1();
-  void control2(float);
+  void control2();
   float omegaController();
   float velocityController();
-  float headingController(float);
+  float headingController();
   void sendDirectlyToMotors();
   void sendDirectlyToMotors(float,float);
   void sendToSlaveMotorController();
