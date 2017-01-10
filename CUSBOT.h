@@ -89,6 +89,7 @@ class CUSBOT{
   float omegaController();
   float velocityController();
   float headingController();
+  float headingController2();
   void sendDirectlyToMotors();
   void sendDirectlyToMotors(float,float);
   void sendToSlaveMotorController();

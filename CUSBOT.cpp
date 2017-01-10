@@ -108,7 +108,7 @@ void CUSBOT::IMU_settle()
     old_yaw = new_yaw; //handing the value of new_yaw to old_yaw so we can see if we converge in the next loop or not
   
           
-    if (number_of_repeatings >= 30 && !yaw_settled) //this means that the readings are settled enough
+    if (number_of_repeatings >= 60 && !yaw_settled) //this means that the readings are settled enough
     {
       yaw_settled = true;
       biasedHeading = new_yaw;
@@ -299,6 +299,65 @@ float CUSBOT::headingController()
   return controlAction;
 }
 
+float CUSBOT::headingController2()
+{
+  float time = (float)millis()/1000.0;
+  float controlAction = 0;
+  float dt = time - velTimeOldh;
+  float error = 0;
+  float new_yaw = ((float)mpu.get_yaw()- biasedHeading)*PI/180.0 ;
+  Serial2.print(biasedHeading);
+  Serial2.print("\t");
+  Serial2.println(new_yaw);
+  float complementary = 0;
+  float desiredLocal = 0;
+  //******* calculating the required direction as seen by the robot
+  float x = 1 * cos(-headingReq);
+  float y = 1 * sin(-headingReq);
+  float xn = cos(new_yaw) * x + sin(new_yaw) * y;
+  float yn = cos(new_yaw) * y - sin(new_yaw) * x; 
+  float phi = atan2(yn,xn);
+  if(phi >= 0 && phi < PI)
+  {
+    desiredLocal = phi;
+  }
+  else if(phi > -PI && phi < 0)
+  {
+    desiredLocal = phi + 2 * (float)PI;
+    complementary = 2 * (float)PI - desiredLocal;
+    if(complementary < desiredLocal)
+    {
+      desiredLocal = -complementary;
+    }
+  }
+  error = desiredLocal - 0; //because in the body axes the heading angle of the rover is always zero   
+//  Serial2.print((float)millis()/1000.0,4);
+//  Serial2.print("\t");
+  // now that we have the error (and it is plausible and sound), we use it to generate the control action
+  Kph = 5; //h for heading
+  Kih = 0.5;
+  Kdh = 0.1;
+//  Kph = 10; //h for heading
+//  Kih = 2;
+//  Kdh = 0;
+  if(dt > 0.02 && dt < 3)
+  {
+    headingErrorHistory[1] = error;
+    headingErrorIntegral[1] = headingErrorIntegral[0] + (headingErrorHistory[1]+headingErrorHistory[0])*0.5*(time-velTimeOldh);
+    headingErrorDifferential = (headingErrorHistory[1] -headingErrorHistory[0])/dt;
+    velTimeOldh = time;
+    headingErrorHistory[0] = headingErrorHistory[1];
+    headingErrorIntegral[0] = headingErrorIntegral[1];
+  }
+  else
+  {
+    velTimeOldh = time;
+  }
+  controlAction = error * Kph + headingErrorIntegral[1] * Kih + Kdh * headingErrorDifferential;
+  return controlAction;
+}
+
+
 void CUSBOT::control1() //this function invokes the neccessary functions to control linear and angular speeds
 {
   float errorVelocity;
@@ -348,12 +407,9 @@ void CUSBOT::control2()
   float errorHeading;
   
   // Applying controllers on errors
-  errorHeading = headingController();
-  errorVelocity = velocityController();
+  errorHeading = headingController2();
   
-//  // calculating required RPMs from processed errors
-//  vLeftReq = errorVelocity + errorHeading * interWheelLength*0.5;
-//  vRightReq = errorVelocity - errorHeading * interWheelLength*0.5;
+  // calculating required RPMs from processed errors
   vLeftReq = vReq + errorHeading * interWheelLength*0.5;
   vRightReq = vReq - errorHeading * interWheelLength*0.5;
 
@@ -362,7 +418,7 @@ void CUSBOT::control2()
   
   RPMLeftReq = constrain(RPMLeftReq,0,1000);
   RPMRightReq = constrain(RPMRightReq,0,1000);
-  
+//  Serial2.println(millis());
   
   if(ACTIVATE_SLAVE_MOTOR_CONTROL)
   {
@@ -452,12 +508,12 @@ void CUSBOT::openLoopSlave(float rpm)
     motorLeft.updateRPM_filtered();
     motorRight.updateRPM_filtered();
   }
-  Serial.print(millis());
-  Serial.print("\t");
-  Serial.print(motorLeft.FilteredRPM);
-  Serial.print("\t");
-  Serial.print(motorRight.FilteredRPM);
-  Serial.println("\t");
+//  Serial.print(millis());
+//  Serial.print("\t");
+//  Serial.print(motorLeft.FilteredRPM);
+//  Serial.print("\t");
+//  Serial.print(motorRight.FilteredRPM);
+//  Serial.println("\t");
 }
 
 void CUSBOT::controlBot() 

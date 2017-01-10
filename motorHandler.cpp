@@ -121,7 +121,7 @@ void motorHandler::updateRPM()
   while(Wire.available())
   {
     message[i] = Wire.read();
-    delay(10);
+    delay(3);
     i++;
   }
 //    Serial.print(message[0]);
@@ -141,7 +141,7 @@ void motorHandler::updateRPM_filtered()
   while(Wire.available())
   {
     message[i] = Wire.read();
-    delay(10);
+    delay(3);
     i++;
   }  
   RPM = (float)(message[0] + message[1] * 10);
