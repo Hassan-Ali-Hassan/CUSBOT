@@ -8,13 +8,14 @@ class wifi{
   public:
   wifi();
   void init();
-  void update();
+  boolean update();
   char messageC[MESSAGESIZE];
   float messageI[MESSAGESIZE]; //I for instructions
   
   protected:
   void parse();
-  void parse2();
+  boolean parse2();
+  boolean parsePosition();
   void setESP();
   void testCon();
   void echo();

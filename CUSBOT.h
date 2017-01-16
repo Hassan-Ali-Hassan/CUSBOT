@@ -15,7 +15,11 @@ class CUSBOT{
   void controlBot(float,float,char); //controls linear and angular speeds
   void IMU_init(); //or else, the code hangs. See implementation for more details
   void WIFI_init();
-
+  void espMqttTest(); //this function is for testing message received via esp. It updates the esp buffer and prints results
+  void updateNeighboursPos();
+  void updateNeighboursPos2();
+  void updatePositions();
+  void updatePositions2();
   // functions for testing purposes
   void controlBot();
   void openLoop(float);
@@ -53,6 +57,12 @@ class CUSBOT{
   // some IMU related variables
   boolean IMU_ok_flag;
   int biasedHeading;
+  float tStart;
+
+  // some variables for wifi position update for other agents
+  float oldTimeu;
+  boolean batonFlag;
+  int position[4];
   
   //variables for the velocity controller function
   float velocityErrorIntegral[2];

@@ -38,6 +38,8 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   vReq = 0;
   omegaReq = 0;
   headingReq = 0;
+  oldTimeu = 0;
+  batonFlag = false;
   
   // variables initialization for velocity control function
   int i = 0;
@@ -85,6 +87,192 @@ void CUSBOT::IMU_init()
   }
 }
 
+void CUSBOT::espMqttTest()
+{
+  if(esp.update())
+  {
+    analogWrite(13,(int)(esp.messageI[0]*10));
+    analogWrite(12,(int)(esp.messageI[1]*10));
+//    Serial.print(esp.messageI[0]*10);
+//    Serial.print("\t");
+    Serial.println(esp.messageI[2]*10);
+  }
+}
+
+void CUSBOT:: updateNeighboursPos()
+{
+  String m;
+  String m2;
+  int value = 0;
+  int value2 = 0;
+  float t = (float)millis()/1000.0 - tStart;
+  if(t-oldTimeu > 0.5) //sending a new value for led intensity via mqtt every 0.5 seconds
+  {
+    value = (int)random(100,255);
+    value2 = (int)random(0,90);
+    if(batonFlag)
+    {
+      m2 = "(b:" + String(0)+")";
+      Serial2.println(m2);
+      batonFlag = !batonFlag;
+    }
+    else
+    {
+      m = "(p:"+String(value)+","+String(value2)+")";
+      if(Serial2.available())
+      {
+        espMqttTest();
+      }
+      Serial2.println(m);
+      batonFlag = !batonFlag;
+    } 
+    oldTimeu = t;
+  }  
+}
+
+void CUSBOT:: updateNeighboursPos2()
+{
+  String m;
+  String m2;
+  int value = 0;
+  int value2 = 0;
+  float t = (float)millis()/1000.0 - tStart;
+  
+  if(t-oldTimeu > 0.5) //sending a new value for led intensity via mqtt every 0.5 seconds
+  {
+    espMqttTest();
+    if(esp.messageI[2]*10 == 0)//robot with index = 1 has just received the baton
+    {
+      value = (int)random(100,255);
+      value2 = (int)random(0,90);
+      if(batonFlag)
+      {
+        value = 1;
+        m2 = "(b:" + String(value)+","+String(value)+")";
+        Serial2.print(m2);
+        batonFlag = !batonFlag;
+        esp.messageI[2] = -1;
+      }
+      else
+      {
+        m = "(p:"+String(value)+","+String(value2)+")";
+        if(Serial2.available())
+        {
+          espMqttTest();
+          Serial.println("we are checking stuff man");
+        }
+        Serial2.print(m);
+        batonFlag = !batonFlag;
+      }     
+    }
+    oldTimeu = t;
+  }  
+}
+
+void CUSBOT:: updatePositions()
+{
+  String outS = String(16)+","+String(23);
+  String in;
+  char a;
+  int index = 0;
+  float t = (float)millis()/1000.0 - tStart;
+  boolean convert = false;
+  if(t-oldTimeu > 0.5)
+  {
+    Serial2.println(outS);
+    delay(20);
+    oldTimeu = t;
+  }
+//  Serial.println("#");
+  while(Serial2.available())
+  {
+    a = Serial2.read();
+//    Serial.println(a);
+    if(a == ',')
+    {
+      position[index] = in.toInt();
+      in="";
+      index++;
+      convert = true;
+    }
+    else
+    {
+      in += a;
+    }    
+  }
+  if(convert)
+  {
+    position[index] = in.toInt();
+    Serial.print(position[index-1]);
+    Serial.print("\t");
+    Serial.println(position[index]);
+    Serial.println("\n");
+    convert = false;
+  }
+}
+
+void CUSBOT:: updatePositions2()
+{
+  String outS = String(random(150,200))+","+String(random(100,150));
+  String in;
+  char a;
+  int index = 0;
+  float t = (float)millis()/1000.0 - tStart;
+  boolean finish = false;
+  boolean Listen = false;
+  boolean start = false;
+  if(t-oldTimeu > 0.1)
+  {
+    Serial2.println(outS);
+    Serial.print(position[index]);
+    Serial.print("\t");
+    Serial.print(position[index+1]);
+    Serial.print("\t");
+    Serial.println(Serial2.available());
+    Listen = true;
+//    delay(5);
+    oldTimeu = t;
+  }
+//  Serial.println("#");
+  while(!finish && Listen)
+  { 
+    while(Serial2.available())
+    {
+      a = Serial2.read();
+      delay(2);
+//      Serial.println(a);
+      if(a == '$')
+      {
+        start = true;
+      }
+      if(start && a != '$') // we have to put the a != '$' condition because if we ommit it, the value of x will be equal to zero because its string will contain $
+      {
+        if(a == ',')
+        {
+          position[index] = in.toInt();
+//          Serial.println(in);
+          in="";
+          index++;
+        }
+        else if(a == '#')
+        {
+//          Serial.println("HI");
+          finish = true;
+          Listen = false;
+          start = false;
+          while( Serial2.read() != -1 ); //flusing the serial buffer
+          position[index] = in.toInt();  
+          break;     
+        }
+        else
+        {
+          in += a;
+        }
+      }    
+    } 
+  }  
+}
+
 void CUSBOT::IMU_settle()
 {
   // mpu.start();
@@ -112,6 +300,7 @@ void CUSBOT::IMU_settle()
     {
       yaw_settled = true;
       biasedHeading = new_yaw;
+      tStart = (float)millis()/1000.0;
       digitalWrite(13,HIGH);
       Serial.println("OK");
     }
@@ -306,9 +495,9 @@ float CUSBOT::headingController2()
   float dt = time - velTimeOldh;
   float error = 0;
   float new_yaw = ((float)mpu.get_yaw()- biasedHeading)*PI/180.0 ;
-  Serial2.print(biasedHeading);
-  Serial2.print("\t");
-  Serial2.println(new_yaw);
+//  Serial2.print(biasedHeading);
+//  Serial2.print("\t");
+//  Serial2.println(new_yaw);
   float complementary = 0;
   float desiredLocal = 0;
   //******* calculating the required direction as seen by the robot
