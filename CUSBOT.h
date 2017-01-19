@@ -15,15 +15,20 @@ class CUSBOT{
   void controlBot(float,float,char); //controls linear and angular speeds
   void IMU_init(); //or else, the code hangs. See implementation for more details
   void WIFI_init();
+  void setInitialPosition(float,float,float);
   void espMqttTest(); //this function is for testing message received via esp. It updates the esp buffer and prints results
   void updateNeighboursPos();
   void updateNeighboursPos2();
   void updatePositions();
   void updatePositions2();
+  void estimatePosition();
+  float estimateDistance();
+  
   // functions for testing purposes
   void controlBot();
   void openLoop(float);
   void openLoopSlave(float);
+  void goInCircle();
   
   protected:
   // ....................................VARIABLES...........................//
@@ -92,6 +97,14 @@ class CUSBOT{
   float Kph; //h for heading
   float Kih;
   float Kdh;
+  float initialHeading; // the angle between the local x and global x axes at the begining of motion (in radians). can be measured and given as input or can be supplied as input from motion capture system
+
+  //variables for the distance estimation function
+  float distanceCovered;
+  float oldTimePos;
+  float oldVelocity;
+  float xPos;
+  float yPos;
   
   //.....................................FUNCTIONS................................//
   void control1();

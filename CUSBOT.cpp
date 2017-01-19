@@ -68,6 +68,12 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   }
   headingErrorDifferential = 0;
   velTimeOldh = 0;
+  initialHeading = 0;
+
+  //variables for the distnace estimation function
+  distanceCovered = 0;
+  oldTimePos = 0;
+  oldVelocity = 0;
 }
 
 void CUSBOT::IMU_init()
@@ -221,14 +227,20 @@ void CUSBOT:: updatePositions2()
   boolean finish = false;
   boolean Listen = false;
   boolean start = false;
-  if(t-oldTimeu > 0.1)
+  boolean ledState = false;
+  
+  if(t-oldTimeu > 0.2)
   {
     Serial2.println(outS);
-    Serial.print(position[index]);
-    Serial.print("\t");
-    Serial.print(position[index+1]);
-    Serial.print("\t");
-    Serial.println(Serial2.available());
+//    Serial.print(position[0]);
+//    Serial.print("\t");
+//    Serial.print(position[1]);
+//    Serial.print("\t");
+//    Serial.print(position[2]);
+//    Serial.print("\t");
+//    Serial.print(position[3]);
+//    Serial.print("\t");
+//    Serial.println(Serial2.available());
     Listen = true;
 //    delay(5);
     oldTimeu = t;
@@ -238,6 +250,7 @@ void CUSBOT:: updatePositions2()
   { 
     while(Serial2.available())
     {
+      digitalWrite(13,LOW);
       a = Serial2.read();
       delay(2);
 //      Serial.println(a);
@@ -247,8 +260,10 @@ void CUSBOT:: updatePositions2()
       }
       if(start && a != '$') // we have to put the a != '$' condition because if we ommit it, the value of x will be equal to zero because its string will contain $
       {
+//        digitalWrite(13,HIGH);
         if(a == ',')
         {
+          digitalWrite(13,HIGH);
           position[index] = in.toInt();
 //          Serial.println(in);
           in="";
@@ -256,6 +271,7 @@ void CUSBOT:: updatePositions2()
         }
         else if(a == '#')
         {
+//          digitalWrite(13,HIGH);
 //          Serial.println("HI");
           finish = true;
           Listen = false;
@@ -488,20 +504,35 @@ float CUSBOT::headingController()
   return controlAction;
 }
 
+/*the core of the heading control is to estimate the current euler angles of the rover wrt the 
+ global axes. In case of using dead reconning, the sensors onboard can can estimate the change 
+ from the initial state. However, they don't have enough information to estimate the heading wrt
+ the global axes. For this reason, we supply the initial heading wrt global axes, and the onboard
+ sensors do the task of estimating the change from these initial values, thus obtaining an estimate
+ of the euler angles wrt global axes.*/
+void CUSBOT::setInitialPosition(float x,float y,float theta)
+{
+  xPos = x;
+  yPos = y;
+  initialHeading = theta;
+}
+
 float CUSBOT::headingController2()
 {
   float time = (float)millis()/1000.0;
   float controlAction = 0;
   float dt = time - velTimeOldh;
   float error = 0;
-  float new_yaw = ((float)mpu.get_yaw()- biasedHeading)*PI/180.0 ;
+  float new_yaw = ((float)mpu.get_yaw()- biasedHeading)*PI/180.0 - initialHeading ;
+//  Serial.print(new_yaw);
+//  Serial.print("\t");
 //  Serial2.print(biasedHeading);
 //  Serial2.print("\t");
 //  Serial2.println(new_yaw);
   float complementary = 0;
   float desiredLocal = 0;
   //******* calculating the required direction as seen by the robot
-  float x = 1 * cos(-headingReq);
+  float x = 1 * cos(-headingReq); //this negative is because the world axes are defined so that the z axis points upwards, so positive heading will be when rotating ccw, while the local axes of the imu are defined so that the z axis points downwards so the positive angle will be when rotating cw. So a negative should be put, synanomous to making a rotation of axes from the local (with z down) to global (with z down)
   float y = 1 * sin(-headingReq);
   float xn = cos(new_yaw) * x + sin(new_yaw) * y;
   float yn = cos(new_yaw) * y - sin(new_yaw) * x; 
@@ -705,6 +736,30 @@ void CUSBOT::openLoopSlave(float rpm)
 //  Serial.println("\t");
 }
 
+void CUSBOT::goInCircle()
+{
+  float v = 1;
+  float f = 0.15;
+  float t = (float)millis()/1000.0 - tStart;
+  
+  float xd = v*cos(2*PI*f*t);
+  float yd = v*sin(2*PI*f*t);
+  float heading = atan2(yd,xd);
+ 
+//  float dt = t - oldTime;
+//  if(dt > 0 && dt < 1.5)heading=0;
+//  else if(dt > 1.5 && dt < 3)heading = -PI/2;
+//  else if(dt >3 && dt < 4.5)heading = -PI;
+//  else if(dt > 4.5 && dt <6)heading = PI/2;
+//  else
+//  {
+//    heading = 0;
+//    oldTime = t;
+//  }
+  
+  // translating the x and y velocity components into velocity and directions
+  controlBot(v,heading,'h');
+}
 void CUSBOT::controlBot() 
 {
   /*this function receives intructions sent through mqtt to move in 
@@ -715,31 +770,68 @@ void CUSBOT::controlBot()
   esp.update();
   vReq = esp.messageI[1];
   omegaReq = esp.messageI[0];
-//  Serial.print(millis());
-//  Serial.print("\t");
-//  Serial.print(vReq);
-//  Serial.print("\t");
-//  Serial.println(omegaReq);
-//  if(vReq != 0)
-//  {   
-//    control1();
-//  }
-//  else
-//  {
-//    for(int i = 0; i < 2; i++)
-//    {
-//      velocityErrorIntegral[i] = 0;
-//      velocityErrorHistory[i] = 0;    
-//    }
-//    for(int i = 0; i < 2; i++)
-//    {
-//      omegaErrorIntegral[i] = 0;
-//      omegaErrorHistory[i] = 0;
-//    }
-//    motorRight.stop();
-//    motorLeft.stop();
-//  } 
-//  control1();
+  /*note: there used to be a code chunk right here that controls the motors
+   * from the main arduino. It has been erased in newer versions as the 
+   * control is being done from the slave units. To obtain this code chunk 
+   * back please refer to older versions code on github.
+   */
   control2();
 }
 
+float CUSBOT::estimateDistance()
+{
+  /*
+   * This function basically integrates the rover's speed to estimate the distance 
+   * covered with time.
+   */
+   float t = (float)millis()/1000.0-tStart;
+   float dt = t - oldTimePos;
+   if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+  {
+    motorLeft.updateRPM_filtered();
+    motorRight.updateRPM_filtered();
+  }
+  currentVelocity = (motorLeft.FilteredRPM + motorRight.FilteredRPM)*0.5 / 60.0 * 2 * PI * wheelRadius;
+  if(currentVelocity < 1.5 && currentVelocity > 0.05)
+  {
+    currentVelocity *= 0.75;
+    distanceCovered += (currentVelocity + oldVelocity)*0.5*dt;
+    oldVelocity = currentVelocity;
+//    Serial2.print(t);
+//    Serial2.print("\t");
+//    Serial2.print(currentVelocity);
+//    Serial2.print("\t");
+//    Serial2.println(distanceCovered);
+  }
+  oldTimePos = t;
+}
+
+void CUSBOT::estimatePosition()
+{
+   float t = (float)millis()/1000.0-tStart;
+   float dt = t - oldTimePos;
+   float phi = 0;
+   float dDistance = 0;
+   if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+  {
+    motorLeft.updateRPM_filtered();
+    motorRight.updateRPM_filtered();
+  }
+  currentVelocity = (motorLeft.FilteredRPM + motorRight.FilteredRPM)*0.5 / 60.0 * 2 * PI * wheelRadius;
+  if(currentVelocity < 1.5 && currentVelocity > 0.05)
+  {
+    currentVelocity *= 0.75;
+    phi = ((float)mpu.get_yaw()- biasedHeading)*PI/180.0 - initialHeading ;
+    dDistance = (currentVelocity + oldVelocity)*0.5*dt;
+    distanceCovered += dDistance;
+    xPos += dDistance * cos(-phi);
+    yPos += dDistance * sin(-phi);
+    oldVelocity = currentVelocity;
+//    Serial2.print(t);
+//    Serial2.print("\t");
+//    Serial2.print(xPos);
+//    Serial2.print("\t");
+//    Serial2.println(yPos);
+  }
+  oldTimePos = t;
+}

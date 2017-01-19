@@ -141,11 +141,11 @@ void motorHandler::updateRPM_filtered()
   while(Wire.available())
   {
     message[i] = Wire.read();
-    delay(3);
     i++;
   }  
   RPM = (float)(message[0] + message[1] * 10);
-  FilteredRPM = rejectOutlier(RPM);
+//  FilteredRPM = rejectOutlier(RPM);
+  FilteredRPM = RPM;
 }
 
 
