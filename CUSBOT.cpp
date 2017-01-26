@@ -219,7 +219,8 @@ void CUSBOT:: updatePositions()
 
 void CUSBOT:: updatePositions2()
 {
-  String outS = String(random(150,200))+","+String(random(100,150));
+//  String outS = String(random(150,200))+","+String(random(100,150));
+  String outS = String((int)(xPos*100))+","+String((int)(yPos*100)); //note that the ESP modules are currently accosumed to sending positions in cm (they are not prepared to handle dicimal points)
   String in;
   char a;
   int index = 0;
@@ -264,7 +265,7 @@ void CUSBOT:: updatePositions2()
         if(a == ',')
         {
           digitalWrite(13,HIGH);
-          position[index] = in.toInt();
+          position[index] = (float)in.toInt()/100.0;//note that the positions obtained are in cm. If used as is the required speed will be too high that will saturate the motors
 //          Serial.println(in);
           in="";
           index++;
@@ -277,7 +278,7 @@ void CUSBOT:: updatePositions2()
           Listen = false;
           start = false;
           while( Serial2.read() != -1 ); //flusing the serial buffer
-          position[index] = in.toInt();  
+          position[index] = (float)in.toInt()/100.0;  
           break;     
         }
         else
@@ -287,6 +288,17 @@ void CUSBOT:: updatePositions2()
       }    
     } 
   }  
+}
+
+void CUSBOT::getPositions(float* a)
+{
+  float yaw = mpu.get_yaw(); //we invoke this function to make sure the IMU is always invokes so as not to veer into chaos state.
+  a[0] = xPos;
+  a[1] = yPos;
+  a[2] = position[0];
+  a[3] = position[1];
+  a[4] = position[2];
+  a[5] = position[3];
 }
 
 void CUSBOT::IMU_settle()
@@ -512,8 +524,8 @@ float CUSBOT::headingController()
  of the euler angles wrt global axes.*/
 void CUSBOT::setInitialPosition(float x,float y,float theta)
 {
-  xPos = x;
-  yPos = y;
+  xPos = x / 100.0;
+  yPos = y / 100.0;
   initialHeading = theta;
 }
 
@@ -769,7 +781,9 @@ void CUSBOT::controlBot()
   controllers are set to zero.*/
   esp.update();
   vReq = esp.messageI[1];
-  omegaReq = esp.messageI[0];
+//  omegaReq = esp.messageI[0];
+  headingReq = -esp.messageI[0];
+  Serial.println(vReq);
   /*note: there used to be a code chunk right here that controls the motors
    * from the main arduino. It has been erased in newer versions as the 
    * control is being done from the slave units. To obtain this code chunk 

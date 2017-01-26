@@ -269,6 +269,6 @@ boolean wifi::isLetter(char a)
 
 boolean wifi::update()
 {
-  if(parsePosition())return true; //if we did the parsing and found a new message, then it's true that we've updated the buffer
+  if(/*parsePosition()*/parse2())return true; //if we did the parsing and found a new message, then it's true that we've updated the buffer
   else return false; // we haven't updated anything yet
 }
