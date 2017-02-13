@@ -75,7 +75,11 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   oldTimePos = 0;
   oldVelocity = 0;
 }
-
+void CUSBOT::keepIMUBusy()
+{
+  int new_yaw = mpu.get_yaw();
+  Serial.println(new_yaw);
+}
 void CUSBOT::IMU_init()
 {
   //this function is important because without it the constructor tries to 
@@ -290,6 +294,71 @@ void CUSBOT:: updatePositions2()
   }  
 }
 
+void CUSBOT::updatePositionsHTTP()
+{
+  String outS = String((int)(xPos*100))+","+String((int)(yPos*100)); //note that the ESP modules are currently accosumed to sending positions in cm (they are not prepared to handle dicimal points)
+  String in;
+  char a;
+  int index = 0;
+  float t = (float)millis()/1000.0 - tStart;
+  float yaw = 0;
+  boolean finish = false;
+  boolean Listen = false;
+  boolean start = false;
+  boolean ledState = false;
+  
+  if(t-oldTimeu > 0.3)
+  {
+    Serial2.println(outS);
+    Listen = true;
+    oldTimeu = t;
+  }
+
+  while(!finish && Listen)
+  {  
+    yaw = mpu.get_yaw();
+    while(Serial2.available())
+    {
+      digitalWrite(13,LOW);
+      a = Serial2.read();
+      delay(1);
+      if(a == '$')
+      {
+        start = true;
+      }
+      if(start && a != '$') // we have to put the a != '$' condition because if we ommit it, the value of x will be equal to zero because its string will contain $
+      {
+        if(a == ',')
+        {
+          digitalWrite(13,HIGH);
+          position[index] = (float)in.toInt()/100.0;//note that the positions obtained are in cm. If used as is the required speed will be too high that will saturate the motors
+          in="";
+          index++;
+        }
+        else if(a == '@')
+        {
+          position[index] = (float)in.toInt()/100.0;
+          in="";
+        }
+        else if(a == '#')
+        {
+          finish = true;
+          Listen = false;
+          start = false;
+          while( Serial2.read() != -1 ); //flusing the serial buffer
+          startMotion = in.toInt();
+          break;     
+        }
+        else
+        {
+          in += a;
+        }
+      }    
+    } 
+  }
+//  for(int j = 0; j < 4; j++){Serial.print(position[j]);Serial.print("\t");}
+//  Serial.println(startMotion);
+}
 void CUSBOT::getPositions(float* a)
 {
   float yaw = mpu.get_yaw(); //we invoke this function to make sure the IMU is always invokes so as not to veer into chaos state.
@@ -299,6 +368,7 @@ void CUSBOT::getPositions(float* a)
   a[3] = position[1];
   a[4] = position[2];
   a[5] = position[3];
+  a[6] = startMotion;
 }
 
 void CUSBOT::IMU_settle()
@@ -324,7 +394,7 @@ void CUSBOT::IMU_settle()
     old_yaw = new_yaw; //handing the value of new_yaw to old_yaw so we can see if we converge in the next loop or not
   
           
-    if (number_of_repeatings >= 60 && !yaw_settled) //this means that the readings are settled enough
+    if (number_of_repeatings >= 120 && !yaw_settled) //this means that the readings are settled enough
     {
       yaw_settled = true;
       biasedHeading = new_yaw;
@@ -445,6 +515,7 @@ float CUSBOT::headingController()
   float error = 0;
   int complementary_error = 0;
   int new_yaw = mpu.get_yaw();
+  Serial.println(new_yaw);
 
   // making some operations on the obtained yaw reading to make sure it is useful and sound
   if(new_yaw < 0)
@@ -834,7 +905,7 @@ void CUSBOT::estimatePosition()
   currentVelocity = (motorLeft.FilteredRPM + motorRight.FilteredRPM)*0.5 / 60.0 * 2 * PI * wheelRadius;
   if(currentVelocity < 1.5 && currentVelocity > 0.05)
   {
-    currentVelocity *= 0.75;
+    currentVelocity *= 1;
     phi = ((float)mpu.get_yaw()- biasedHeading)*PI/180.0 - initialHeading ;
     dDistance = (currentVelocity + oldVelocity)*0.5*dt;
     distanceCovered += dDistance;

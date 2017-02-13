@@ -22,6 +22,7 @@ class CUSBOT{
   void updateNeighboursPos2();
   void updatePositions();
   void updatePositions2();
+  void updatePositionsHTTP();
   void estimatePosition();
   float estimateDistance();
   
@@ -30,6 +31,7 @@ class CUSBOT{
   void openLoop(float);
   void openLoopSlave(float);
   void goInCircle();
+  void keepIMUBusy();
   
   protected:
   // ....................................VARIABLES...........................//
@@ -69,6 +71,7 @@ class CUSBOT{
   float oldTimeu;
   boolean batonFlag;
   float position[4];
+  int startMotion;
   
   //variables for the velocity controller function
   float velocityErrorIntegral[2];
