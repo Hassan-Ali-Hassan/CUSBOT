@@ -32,6 +32,7 @@ class CUSBOT{
   void openLoopSlave(float);
   void goInCircle();
   void keepIMUBusy();
+  void xbeeLikeOperation(); //this function makes the robot moves in different direction like it is controlled with conventional xbee or wireless module
   
   protected:
   // ....................................VARIABLES...........................//

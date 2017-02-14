@@ -16,8 +16,8 @@ float zref[4];
 void setup()
 {
   Serial.begin(115200);
-  Serial2.begin(115200);
-//  Serial2.begin(9600);
+//  Serial2.begin(115200);
+  Serial2.begin(9600);
   Wire.begin();
   randomSeed(analogRead(0));
   pinMode(13,OUTPUT);
@@ -65,7 +65,9 @@ void loop()
 //  rendezvous();
 //  rendezvous2();
 //  formation();
-  formation2();
+//  formation2();
+//  GO();
+  Bot.xbeeLikeOperation();
 //  Serial.println(t-oldTime,6);
   oldTime = t;
 }
@@ -295,4 +297,50 @@ void formation2()
  }
 }
 
+/* In what follows are some testing functions to test different parts of the system*/
+void GO()
+{
+  /*
+   * This function aims to let every robot in the network go towards its neighbours and
+   * eventually hit each other.
+   */
+ float xdot = 0;
+ float ydot = 0;
+ int i = 0;
+ float a[7];
+ float vel = 0;
+ float theta = 0;
+ float yaw = 0;
+ static boolean start = false;
+ static boolean checkStart = true;
+ float factor = 0.5;
 
+ Bot.estimatePosition(); //tries to figure out where we are
+ Bot.updatePositionsHTTP(); //tries to fgiure out where the neighbours are
+ Bot.getPositions(a);  //just returns the positions.
+ for(int j = 0; j < 6; j++){Serial.print(a[j]);Serial.print("\t");}
+  Serial.println((int)a[6]);
+// checkAnomalies(a);
+ 
+ /* making sure that the neighbours' positions are not zero, as a signal to start*/
+ if((int)a[6] == 1)
+ {
+  start = true;
+ }
+ else
+ {
+  start = false;
+ }
+ if(start)
+ {
+//   Bot.controlBot(vel,theta,'h');
+    v = 0.7;
+    Bot.controlBot(v,0,'h');
+//    if(millis() > 25000)v = 0;
+ }
+ else
+ {
+    v = 0;
+    Bot.controlBot(v,0,'h');
+ }
+}

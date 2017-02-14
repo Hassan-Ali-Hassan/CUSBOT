@@ -75,11 +75,51 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   oldTimePos = 0;
   oldVelocity = 0;
 }
+
 void CUSBOT::keepIMUBusy()
 {
   int new_yaw = mpu.get_yaw();
   Serial.println(new_yaw);
 }
+
+void CUSBOT::xbeeLikeOperation()
+{
+  char a = 0;
+  static float s = 0.7;
+  static float d = 0;
+  if(Serial2.available())
+  {
+    a = Serial2.read();
+    switch(a)
+    {
+      case 'w':
+      s += 0.05;
+      break;
+
+      case 's':
+      s -= 0.05;
+      break;
+
+      case 'd':
+      d -= 10.0*PI/180.0;
+      break;
+
+      case 'a':
+      d += 10.0*PI/180.0;
+      break;
+
+      default:
+      s = 0;
+      d = 0;
+      break;
+    }
+    Serial2.print(s);
+    Serial2.print("\t");
+    Serial2.println(d);
+  }
+  controlBot(s,d,'h');
+}
+
 void CUSBOT::IMU_init()
 {
   //this function is important because without it the constructor tries to 
