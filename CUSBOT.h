@@ -5,9 +5,12 @@
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "wifi.h"
+#include "ADNS3080.h"
 
 #define ACTIVATE_SLAVE_MOTOR_CONTROL 1
 #define ACTIVATE_ANGLE_CONTROL 1
+#define OPTICALFLOW_ENABLED 0
+
 class CUSBOT{
   
   public:
@@ -15,6 +18,9 @@ class CUSBOT{
   void controlBot(float,float,char); //controls linear and angular speeds
   void IMU_init(); //or else, the code hangs. See implementation for more details
   void WIFI_init();
+  #if OPTICALFLOW_ENABLED == 1
+  void optical_init();
+  #endif
   void setInitialPosition(float,float,float);
   void getPositions(float*);
   void espMqttTest(); //this function is for testing message received via esp. It updates the esp buffer and prints results
@@ -24,6 +30,7 @@ class CUSBOT{
   void updatePositions2();
   void updatePositionsHTTP();
   void estimatePosition();
+  void estimatePosition2();
   float estimateDistance();
   
   // functions for testing purposes
@@ -49,6 +56,9 @@ class CUSBOT{
   motorHandler motorRight;
   MPU6050 mpu;
   wifi esp;
+  #if OPTICALFLOW_ENABLED == 1
+  ADNS3080 opticalFlow;
+  #endif
   
   //variables
   float vLeftReq;
@@ -110,6 +120,8 @@ class CUSBOT{
   float oldVelocity;
   float xPos;
   float yPos;
+  int x_init;
+  int y_init;
   
   //.....................................FUNCTIONS................................//
   void control1();

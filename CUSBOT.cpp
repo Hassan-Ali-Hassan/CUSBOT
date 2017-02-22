@@ -85,13 +85,21 @@ void CUSBOT::keepIMUBusy()
 void CUSBOT::xbeeLikeOperation()
 {
   char a = 0;
-  static float s = 0.7;
+  static float s = 0;
   static float d = 0;
+  #if OPTICALFLOW_ENABLED == 1
+  float phi = ((float)mpu.get_yaw()- biasedHeading)*PI/180.0 - initialHeading;
+  opticalFlow.update(phi);
+  #endif
   if(Serial2.available())
   {
     a = Serial2.read();
     switch(a)
     {
+      case 'f':
+      s = 0.35;
+      break;
+      
       case 'w':
       s += 0.05;
       break;
@@ -113,10 +121,17 @@ void CUSBOT::xbeeLikeOperation()
       d = 0;
       break;
     }
-    Serial2.print(s);
-    Serial2.print("\t");
-    Serial2.println(d);
+//    Serial2.print(s);
+//    Serial2.print("\t");
+//    Serial2.println(d);
   }
+  #if OPTICALFLOW_ENABLED == 1
+  Serial2.print(opticalFlow.squal);
+  Serial2.print("\t");
+  Serial2.print(opticalFlow.X);
+  Serial2.print("\t");
+  Serial2.println(opticalFlow.Y);
+  #endif
   controlBot(s,d,'h');
 }
 
@@ -454,6 +469,18 @@ void CUSBOT::WIFI_init()
   esp.init();
 }
 
+#if OPTICALFLOW_ENABLED == 1 /*using optical flow sensor*/
+void CUSBOT::optical_init()
+{
+  if(opticalFlow.mousecam_init()==-1)
+  {
+    Serial.println("Mouse cam failed to init");
+    Serial2.println("Mouse cam failed to init");
+    while(1);
+  }  
+}
+#endif
+
 float CUSBOT::velocityController()
 {
   float time = (float)millis()/1000.0;
@@ -635,6 +662,8 @@ float CUSBOT::headingController()
  of the euler angles wrt global axes.*/
 void CUSBOT::setInitialPosition(float x,float y,float theta)
 {
+  x_init = x;
+  y_init = y;
   xPos = x / 100.0;
   yPos = y / 100.0;
   initialHeading = theta;
@@ -960,3 +989,59 @@ void CUSBOT::estimatePosition()
   }
   oldTimePos = t;
 }
+
+void CUSBOT::estimatePosition2()
+{
+  static bool slaveSet = false;
+  int i = 0;
+  float px,py;
+  float phi = ((float)mpu.get_yaw()- biasedHeading) - initialHeading *180.0 /PI;
+  if(phi < 0) phi += 360;
+//  Serial2.print(phi);
+//  Serial2.print("\t");
+  byte inMessage[4];
+  byte outMessage[7];//contains the heading 
+//  phi = 0;
+  //sending heading angle to the optical flow
+  outMessage[1] = (int)phi / 10;
+  outMessage[0] = (int)(phi - outMessage[1] * 10);
+  outMessage[3] = (int)x_init / 10;
+  outMessage[2] = (int)(x_init - outMessage[3] * 10);
+  outMessage[5] = (int)y_init / 10;
+  outMessage[4] = (int)(y_init - outMessage[5] * 10);
+  if(!slaveSet)
+  {  
+    outMessage[6] = 1;
+    slaveSet = true;
+  }
+  else
+  {
+    outMessage[6] = 0;
+  }
+  Wire.beginTransmission(8);
+  Wire.write(outMessage,7);
+  Wire.endTransmission();
+  
+  //receiving the current position from optical flow
+  Wire.requestFrom(8,6);
+  while(Wire.available())
+  {
+    inMessage[i] = Wire.read();
+//    Serial2.print(inMessage[i]);
+//    Serial2.print("\t");
+    i++;
+  }
+//  Serial2.println();
+  px = inMessage[0] + inMessage[1] * 10;
+  if(inMessage[2] == 1) px *= -1;
+  py = inMessage[3] + inMessage[4] * 10;
+  if(inMessage[5] == 1) py *= -1;
+  px /= 100.0; //converting to m
+  py /= 100.0;
+  xPos = px;
+  yPos = py;
+//  Serial2.print(xPos);
+//  Serial2.print("\t");
+//  Serial2.println(yPos);
+}
+

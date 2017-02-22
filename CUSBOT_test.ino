@@ -1,7 +1,7 @@
 #include<Wire.h> 
 #include "CUSBOT.h"
 
-#define CASE 1
+#define CASE 2
 #define AGENT 1
 
 CUSBOT Bot(3,4,2,5,6,7);
@@ -16,18 +16,32 @@ float zref[4];
 void setup()
 {
   Serial.begin(115200);
-//  Serial2.begin(115200);
+  
+  #if CASE == 1 /*normal operation without optical flow sensor, and with using wifi module*/
+  Serial2.begin(115200);
+  #elif CASE == 2 /*operation using xbee like wireless module*/
   Serial2.begin(9600);
+  #endif
+
+  #if OPTICALFLOW_ENABLED == 1
+  SPI.begin();
+  SPI.setClockDivider(SPI_CLOCK_DIV32);
+  SPI.setDataMode(SPI_MODE3);
+  SPI.setBitOrder(MSBFIRST);
+  Bot.optical_init();
+  #endif
   Wire.begin();
   randomSeed(analogRead(0));
   pinMode(13,OUTPUT);
-  pinMode(12,OUTPUT);
+  pinMode(44,OUTPUT);
+  digitalWrite(44,HIGH);
+//  digitalWrite(44,LOW);
 //  Bot.WIFI_init();
   Bot.IMU_init();
 
   #if AGENT == 1
-//  Bot.setInitialPosition(120,275,0);
-  Bot.setInitialPosition(195,120,0); //Note that positions are in cm and angles are in radians
+  Bot.setInitialPosition(0,0,0);
+//  Bot.setInitialPosition(195,120,0); //Note that positions are in cm and angles are in radians
   numOfNeighbours = 1;
 //  zref[0] = 0.5; zref[1] = 0.866; //this vector contains the reference values of the interagent vectors, expressed in global axes
   zref[0] = -0.5; zref[1] = -0.866;
@@ -53,7 +67,7 @@ void loop()
   t = (float)millis()/1000.0;
   /* Testing segment, to make sure the robots are up and running*/
 //  Bot.controlBot();
-//  Bot.controlBot(v,-PI/4,'h'); //for now, you have to multiply omega by 0.7 for correct performance
+//  Bot.controlBot(v,-PI/4*0,'h'); //for now, you have to multiply omega by 0.7 for correct performance
 //  Bot.openLoop(200.0);
 //  Bot.openLoopSlave(80);
 //  Bot.updatePositions2();
@@ -68,10 +82,19 @@ void loop()
 //  formation2();
 //  GO();
   Bot.xbeeLikeOperation();
+  opticalFlowTest();
 //  Serial.println(t-oldTime,6);
   oldTime = t;
 }
 
+void opticalFlowTest()
+{
+  Bot.estimatePosition2();
+  Bot.getPositions(pos);
+  Serial2.print(pos[0]);
+  Serial2.print("\t");
+  Serial2.println(pos[1]);
+}
 void rendezvous()
 {
   /*
