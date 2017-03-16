@@ -1,7 +1,7 @@
 #include<Wire.h> 
 #include "CUSBOT.h"
 
-#define CASE 2
+#define CASE 1
 #define AGENT 1
 
 CUSBOT Bot(3,4,2,5,6,7);
@@ -34,14 +34,14 @@ void setup()
   randomSeed(analogRead(0));
   pinMode(13,OUTPUT);
   pinMode(44,OUTPUT);
-  digitalWrite(44,HIGH);
+//  digitalWrite(44,HIGH);
 //  digitalWrite(44,LOW);
 //  Bot.WIFI_init();
   Bot.IMU_init();
 
   #if AGENT == 1
-  Bot.setInitialPosition(0,0,0);
-//  Bot.setInitialPosition(195,120,0); //Note that positions are in cm and angles are in radians
+//  Bot.setInitialPosition(0,0,0);
+  Bot.setInitialPosition(195,120,0); //Note that positions are in cm and angles are in radians
   numOfNeighbours = 1;
 //  zref[0] = 0.5; zref[1] = 0.866; //this vector contains the reference values of the interagent vectors, expressed in global axes
   zref[0] = -0.5; zref[1] = -0.866;
@@ -64,26 +64,37 @@ void setup()
 
 void loop()
 {
-  t = (float)millis()/1000.0;
+  t = (float)millis()/1000.0 - Bot.getStartingTime();
   /* Testing segment, to make sure the robots are up and running*/
 //  Bot.controlBot();
 //  Bot.controlBot(v,-PI/4*0,'h'); //for now, you have to multiply omega by 0.7 for correct performance
 //  Bot.openLoop(200.0);
 //  Bot.openLoopSlave(80);
 //  Bot.updatePositions2();
+//  Bot.updatePositions3();
 //  Bot.updatePositionsHTTP();
 //  Bot.estimateDistance();
 //  Bot.estimatePosition();
-//  if(t>10)v = 0;
+//  if(t>5)Bot.stopRover();
 //  Bot.goInCircle();
 //  rendezvous();
 //  rendezvous2();
 //  formation();
 //  formation2();
 //  GO();
-  Bot.xbeeLikeOperation();
-  opticalFlowTest();
+//  Bot.xbeeLikeOperation();
+//  opticalFlowTest();
 //  Serial.println(t-oldTime,6);
+
+  if(t > 5 && t < 10)
+  {
+    Bot.stopRover();
+    Bot.keepIMUBusy();
+  }
+  else
+  {
+    Bot.controlBot(0.5,-PI/4,'h');
+  }
   oldTime = t;
 }
 
@@ -113,7 +124,7 @@ void rendezvous()
  float factor = 0.3;
 
  Bot.estimatePosition(); //tries to figure out where we are
- Bot.updatePositions2(); //tries to fgiure out where the neighbours are
+ Bot.updatePositions3(); //tries to fgiure out where the neighbours are
  Bot.getPositions(a);  //just returns the positions.
 // checkAnomalies(a);
  
@@ -239,6 +250,7 @@ void rendezvous2()
  else
  {
   start = false;
+  Bot.controlBot(0,0,'h');
  }
  if(start)
  {

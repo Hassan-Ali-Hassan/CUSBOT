@@ -349,6 +349,78 @@ void CUSBOT:: updatePositions2()
   }  
 }
 
+void CUSBOT:: updatePositions3()
+{
+//  String outS = String(random(150,200))+","+String(random(100,150));
+  String outS = "a";
+  String in;
+  char a;
+  int index = 0;
+  float t = (float)millis()/1000.0 - tStart;
+  boolean finish = false;
+  boolean Listen = false;
+  boolean start = false;
+  boolean ledState = false;
+  
+  if(t-oldTimeu > 0.2)
+  {
+    Serial2.println(outS);
+    Listen = true;
+//    delay(5);
+    oldTimeu = t;
+  }
+//  Serial.println("#");
+  while(!finish && Listen)
+  { 
+    while(Serial2.available())
+    {
+      digitalWrite(13,LOW);
+      a = Serial2.read();
+      delay(2);
+//      Serial.println(a);
+      if(a == '$')
+      {
+        start = true;
+      }
+      if(start && a != '$') // we have to put the a != '$' condition because if we ommit it, the value of x will be equal to zero because its string will contain $
+      {
+//        digitalWrite(13,HIGH);
+        if(a == ',')
+        {
+          digitalWrite(13,HIGH);
+          position[index] = (float)in.toInt()/100.0;//note that the positions obtained are in cm. If used as is the required speed will be too high that will saturate the motors
+//          Serial.println(in);
+          in="";
+          index++;
+        }
+        else if(a == '#')
+        {
+//          digitalWrite(13,HIGH);
+//          Serial.println("HI");
+          finish = true;
+          Listen = false;
+          start = false;
+          while( Serial2.read() != -1 ); //flusing the serial buffer
+          position[index] = (float)in.toInt()/100.0;  
+          xPos = position[0];
+          yPos = position[1];
+          break;     
+        }
+        else
+        {
+          in += a;
+        }
+      }    
+    } 
+  } 
+  for(int i = 0; i < 6; i++)
+  {
+    Serial.print(position[i]);
+    Serial.print("\t"); 
+  }
+  Serial.println();
+}
+
 void CUSBOT::updatePositionsHTTP()
 {
   String outS = String((int)(xPos*100))+","+String((int)(yPos*100)); //note that the ESP modules are currently accosumed to sending positions in cm (they are not prepared to handle dicimal points)
@@ -414,6 +486,7 @@ void CUSBOT::updatePositionsHTTP()
 //  for(int j = 0; j < 4; j++){Serial.print(position[j]);Serial.print("\t");}
 //  Serial.println(startMotion);
 }
+
 void CUSBOT::getPositions(float* a)
 {
   float yaw = mpu.get_yaw(); //we invoke this function to make sure the IMU is always invokes so as not to veer into chaos state.
@@ -423,6 +496,18 @@ void CUSBOT::getPositions(float* a)
   a[3] = position[1];
   a[4] = position[2];
   a[5] = position[3];
+  a[6] = startMotion;
+}
+
+void CUSBOT::getPositions2(float* a)
+{
+  float yaw = mpu.get_yaw(); //we invoke this function to make sure the IMU is always invokes so as not to veer into chaos state.
+  a[0] = position[0];
+  a[1] = position[1];
+  a[2] = position[2];
+  a[3] = position[3];
+  a[4] = position[4];
+  a[5] = position[5];
   a[6] = startMotion;
 }
 
@@ -814,6 +899,24 @@ void CUSBOT::sendDirectlyToMotors(float a, float b)
   motorRight.controlRPM(b);
 }
 
+void CUSBOT::stopRover()
+{
+  /*
+   * Now notice that the codes in the master and slave units are designed 
+   * in way that it has a certain cnovention: when messsge[2] = 0; this means
+   * normal operation, =1 means reverse rotation direction while =2 means 
+   * stop completely.
+   */
+  byte message[3] = {0,0,2};
+  
+  Wire.beginTransmission(6);
+  Wire.write(message,3);
+  Wire.endTransmission();
+
+  Wire.beginTransmission(5);
+  Wire.write(message,3);
+  Wire.endTransmission();
+}
 void CUSBOT::sendToSlaveMotorController()
 {
   byte message[3] = {0,0,0};
@@ -1043,5 +1146,10 @@ void CUSBOT::estimatePosition2()
 //  Serial2.print(xPos);
 //  Serial2.print("\t");
 //  Serial2.println(yPos);
+}
+
+float CUSBOT::getStartingTime()
+{
+  return tStart;
 }
 

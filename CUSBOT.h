@@ -23,19 +23,23 @@ class CUSBOT{
   #endif
   void setInitialPosition(float,float,float);
   void getPositions(float*);
+  void getPositions2(float*);
   void espMqttTest(); //this function is for testing message received via esp. It updates the esp buffer and prints results
   void updateNeighboursPos();
   void updateNeighboursPos2();
   void updatePositions();
   void updatePositions2();
+  void updatePositions3();
   void updatePositionsHTTP();
   void estimatePosition();
   void estimatePosition2();
   float estimateDistance();
+  float getStartingTime();
   
   // functions for testing purposes
   void controlBot();
   void openLoop(float);
+  void stopRover();
   void openLoopSlave(float);
   void goInCircle();
   void keepIMUBusy();
@@ -81,7 +85,7 @@ class CUSBOT{
   // some variables for wifi position update for other agents
   float oldTimeu;
   boolean batonFlag;
-  float position[4];
+  float position[6];
   int startMotion;
   
   //variables for the velocity controller function
