@@ -91,9 +91,9 @@ void CUSBOT::xbeeLikeOperation()
   float phi = ((float)mpu.get_yaw()- biasedHeading)*PI/180.0 - initialHeading;
   opticalFlow.update(phi);
   #endif
-  if(Serial2.available())
+  if(Serial3.available())
   {
-    a = Serial2.read();
+    a = Serial3.read();
     switch(a)
     {
       case 'f':
@@ -121,16 +121,16 @@ void CUSBOT::xbeeLikeOperation()
       d = 0;
       break;
     }
-//    Serial2.print(s);
-//    Serial2.print("\t");
-//    Serial2.println(d);
+//    Serial3.print(s);
+//    Serial3.print("\t");
+//    Serial3.println(d);
   }
   #if OPTICALFLOW_ENABLED == 1
-  Serial2.print(opticalFlow.squal);
-  Serial2.print("\t");
-  Serial2.print(opticalFlow.X);
-  Serial2.print("\t");
-  Serial2.println(opticalFlow.Y);
+  Serial3.print(opticalFlow.squal);
+  Serial3.print("\t");
+  Serial3.print(opticalFlow.X);
+  Serial3.print("\t");
+  Serial3.println(opticalFlow.Y);
   #endif
   controlBot(s,d,'h');
 }
@@ -377,7 +377,7 @@ void CUSBOT:: updatePositions3()
       digitalWrite(13,LOW);
       a = Serial2.read();
       delay(2);
-//      Serial.println(a);
+//      Serial3.println(a);
       if(a == '$')
       {
         start = true;
@@ -413,11 +413,11 @@ void CUSBOT:: updatePositions3()
       }    
     } 
   } 
-  for(int i = 0; i < 6; i++)
-  {
-    Serial.print(position[i]);
-    Serial.print("\t"); 
-  }
+//  for(int i = 0; i < 6; i++)
+//  {
+//    Serial.print(position[i]);
+//    Serial.print("\t"); 
+//  }
   Serial.println();
 }
 
@@ -956,7 +956,11 @@ void CUSBOT::breakDownRPM(byte* message,float value)
 void CUSBOT::controlBot(float linearVelocity,float value, char MODE)
 {
   vReq = linearVelocity;
-  if(MODE == 'o') //which stands for omega
+  if(linearVelocity == 0)
+  {
+    stopRover();
+  }
+  else if(MODE == 'o') //which stands for omega
   {
     omegaReq = value;
     control1();

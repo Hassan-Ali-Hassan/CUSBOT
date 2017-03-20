@@ -1,7 +1,6 @@
 #include<Wire.h> 
 #include "CUSBOT.h"
 
-#define CASE 1
 #define AGENT 1
 
 CUSBOT Bot(3,4,2,5,6,7);
@@ -15,13 +14,9 @@ float zref[4];
 
 void setup()
 {
-  Serial.begin(115200);
-  
-  #if CASE == 1 /*normal operation without optical flow sensor, and with using wifi module*/
+//  Serial.begin(115200);
   Serial2.begin(115200);
-  #elif CASE == 2 /*operation using xbee like wireless module*/
-  Serial2.begin(9600);
-  #endif
+  Serial3.begin(9600);
 
   #if OPTICALFLOW_ENABLED == 1
   SPI.begin();
@@ -38,7 +33,7 @@ void setup()
 //  digitalWrite(44,LOW);
 //  Bot.WIFI_init();
   Bot.IMU_init();
-
+  while( Serial2.read() != -1 ); //flusing the serial buffer after initializing the IMU, in order to neglect the initial confirmation string coming from the esp module
   #if AGENT == 1
 //  Bot.setInitialPosition(0,0,0);
   Bot.setInitialPosition(195,120,0); //Note that positions are in cm and angles are in radians
@@ -85,26 +80,50 @@ void loop()
 //  Bot.xbeeLikeOperation();
 //  opticalFlowTest();
 //  Serial.println(t-oldTime,6);
-
-  if(t > 5 && t < 10)
-  {
-    Bot.stopRover();
-    Bot.keepIMUBusy();
-  }
-  else
-  {
-    Bot.controlBot(0.5,-PI/4,'h');
-  }
+  moveAndLocalize2();
+//  if(t > 5 && t < 10)
+//  {
+//    Bot.stopRover();
+//    Bot.keepIMUBusy();
+//  }
+//  else
+//  {
+//    Bot.controlBot(0.5,-PI/4,'h');
+//  }
   oldTime = t;
+}
+
+void moveAndLocalize()
+{
+  float a[7];
+  Bot.xbeeLikeOperation();
+  Bot.estimatePosition(); //tries to figure out where we are
+  Bot.updatePositionsHTTP(); //tries to fgiure out where the neighbours are
+  Bot.getPositions(a);  //just returns the positions.
+  Serial3.print(a[0]);
+  Serial3.print("\t");
+  Serial3.println(a[1]);
+}
+
+void moveAndLocalize2()
+{
+  float a[7];
+  Bot.xbeeLikeOperation();
+//  Bot.estimatePosition(); //tries to figure out where we are
+  Bot.updatePositions3(); //tries to fgiure out where the neighbours are
+  Bot.getPositions2(a);  //just returns the positions.
+  Serial3.print(a[0]);
+  Serial3.print("\t");
+  Serial3.println(a[1]);
 }
 
 void opticalFlowTest()
 {
   Bot.estimatePosition2();
   Bot.getPositions(pos);
-  Serial2.print(pos[0]);
-  Serial2.print("\t");
-  Serial2.println(pos[1]);
+  Serial3.print(pos[0]);
+  Serial3.print("\t");
+  Serial3.println(pos[1]);
 }
 void rendezvous()
 {
