@@ -7,7 +7,7 @@ CUSBOT Bot(3,4,2,5,6,7);
 
 float oldTime = 0;
 float t = 0;
-float v = 0.7;
+float v = 0.5;
 float pos[6];
 int numOfNeighbours = 0;
 float zref[4];
@@ -73,6 +73,7 @@ void loop()
 //  if(t>5)Bot.stopRover();
 //  Bot.goInCircle();
 //  rendezvous();
+//  rendezvousWithCamera();
 //  rendezvous2();
 //  formation();
 //  formation2();
@@ -80,16 +81,18 @@ void loop()
 //  Bot.xbeeLikeOperation();
 //  opticalFlowTest();
 //  Serial.println(t-oldTime,6);
-  moveAndLocalize2();
-//  if(t > 5 && t < 10)
-//  {
-//    Bot.stopRover();
-//    Bot.keepIMUBusy();
-//  }
-//  else
-//  {
+//  moveAndLocalize2();
+  if(t > 5)
+  {
+    Bot.stopRover();
+    Bot.keepIMUBusy();
+  }
+  else
+  {
 //    Bot.controlBot(0.5,-PI/4,'h');
-//  }
+//    Bot.controlBot(v,-PI/4*0,'h');
+    Bot.openLoopSlave(1000);
+  }
   oldTime = t;
 }
 
@@ -114,7 +117,9 @@ void moveAndLocalize2()
   Bot.getPositions2(a);  //just returns the positions.
   Serial3.print(a[0]);
   Serial3.print("\t");
-  Serial3.println(a[1]);
+  Serial3.print(a[1]);
+  Serial3.print("\t");
+  Serial3.println(a[6]);
 }
 
 void opticalFlowTest()
@@ -143,7 +148,7 @@ void rendezvous()
  float factor = 0.3;
 
  Bot.estimatePosition(); //tries to figure out where we are
- Bot.updatePositions3(); //tries to fgiure out where the neighbours are
+ Bot.updatePositions(); //tries to fgiure out where the neighbours are
  Bot.getPositions(a);  //just returns the positions.
 // checkAnomalies(a);
  
@@ -179,7 +184,57 @@ void rendezvous()
    Bot.controlBot(vel,theta,'h');
  }
 }
+///////////////////////////////////////////////////////////////////////////////////////////////
+void rendezvousWithCamera()
+{
+  /*
+   * This function aims to let every robot in the network go towards its neighbours and
+   * eventually hit each other.
+   */
+ float xdot = 0;
+ float ydot = 0;
+ int i = 0;
+ float a[7];
+ float vel = 0;
+ float theta = 0;
+ float yaw = 0;
+ static boolean start = false;
+ static boolean checkStart = true;
+ float factor = 0.3;
 
+// Bot.estimatePosition(); //tries to figure out where we are
+ Bot.updatePositions3(); //tries to fgiure out where the neighbours are
+ Bot.getPositions2(a);  //just returns the positions.
+ Serial3.print(a[0]);
+  Serial3.print("\t");
+  Serial3.print(a[1]);
+  Serial3.print("\t");
+  Serial3.println(a[6]);
+ 
+ /* making sure that the neighbours' positions are not zero, as a signal to start*/
+ if(a[6] == 1)
+ {
+   for(i = 1; i <=numOfNeighbours; i++)//we loop to 2 as the current case is of 3 robots, where every robot has at most two neighbours
+   {
+    xdot += (a[2*i] - a[0])*factor;
+    ydot += (a[2*i+1] - a[1])*factor;
+   }
+   vel = sqrt(xdot*xdot + ydot*ydot);
+   theta = atan2(ydot,xdot);
+   
+   if(vel < 0.2) vel = 0;
+   
+   Serial.print(theta);
+   Serial.print("\t");
+   Serial.println(vel);
+   Bot.controlBot(vel,theta,'h');
+ }
+ else
+ {
+  Bot.stopRover();
+ }
+}
+/////////////////////////////////////////////////////////////////////////////////////////////
 void formation()
 {
   /*

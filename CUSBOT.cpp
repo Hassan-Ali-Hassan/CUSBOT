@@ -34,7 +34,7 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   RPMLeftReq = 0;
   RPMRightReq = 0;
   interWheelLength = 0.18;
-  wheelRadius = 0.0692*0.5;
+  wheelRadius = 0.0692*0.375;
   vReq = 0;
   omegaReq = 0;
   headingReq = 0;
@@ -397,14 +397,19 @@ void CUSBOT:: updatePositions3()
         {
 //          digitalWrite(13,HIGH);
 //          Serial.println("HI");
+          position[index] = (float)in.toInt()/100.0;  
+          xPos = position[0];
+          yPos = position[1];
+          in="";
+          break;     
+        }
+        else if(a == '^')
+        {
           finish = true;
           Listen = false;
           start = false;
           while( Serial2.read() != -1 ); //flusing the serial buffer
-          position[index] = (float)in.toInt()/100.0;  
-          xPos = position[0];
-          yPos = position[1];
-          break;     
+          startMotion = in.toInt();
         }
         else
         {
