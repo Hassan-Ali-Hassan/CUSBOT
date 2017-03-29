@@ -44,6 +44,8 @@ class CUSBOT{
   void goInCircle();
   void keepIMUBusy();
   void xbeeLikeOperation(); //this function makes the robot moves in different direction like it is controlled with conventional xbee or wireless module
+  void parameterEstimationTest();
+  void parameterEstimationTest2();
   
   protected:
   // ....................................VARIABLES...........................//

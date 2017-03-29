@@ -1,8 +1,7 @@
 #include<Wire.h> 
 #include "CUSBOT.h"
 
-#define AGENT 1
-
+#define AGENT 2
 CUSBOT Bot(3,4,2,5,6,7);
 
 float oldTime = 0;
@@ -11,6 +10,7 @@ float v = 0.5;
 float pos[6];
 int numOfNeighbours = 0;
 float zref[4];
+bool testParam = true;
 
 void setup()
 {
@@ -73,7 +73,7 @@ void loop()
 //  if(t>5)Bot.stopRover();
 //  Bot.goInCircle();
 //  rendezvous();
-//  rendezvousWithCamera();
+  rendezvousWithCamera();
 //  rendezvous2();
 //  formation();
 //  formation2();
@@ -82,17 +82,32 @@ void loop()
 //  opticalFlowTest();
 //  Serial.println(t-oldTime,6);
 //  moveAndLocalize2();
-  if(t > 5)
-  {
-    Bot.stopRover();
-    Bot.keepIMUBusy();
-  }
-  else
-  {
-//    Bot.controlBot(0.5,-PI/4,'h');
-//    Bot.controlBot(v,-PI/4*0,'h');
-    Bot.openLoopSlave(1000);
-  }
+//  if(testParam)
+//  {
+//    Bot.parameterEstimationTest();
+//    testParam = false;
+//  }
+//  if(t > 5)
+//  {
+//    Bot.stopRover();
+//    Bot.keepIMUBusy();
+//  }
+//  else
+//  {
+////    Bot.controlBot(0.5,-PI/4,'h');
+////    Bot.controlBot(v,-PI/4*0,'h');
+//    Bot.openLoopSlave(1000);
+//  }
+
+//  if(Serial3.available())
+//  {
+//    char b = Serial3.read();
+//    Serial3.println("hi world");
+//  }
+//  else
+//  {
+//    Serial3.println("no");
+//  }
   oldTime = t;
 }
 
@@ -205,11 +220,11 @@ void rendezvousWithCamera()
 // Bot.estimatePosition(); //tries to figure out where we are
  Bot.updatePositions3(); //tries to fgiure out where the neighbours are
  Bot.getPositions2(a);  //just returns the positions.
- Serial3.print(a[0]);
-  Serial3.print("\t");
-  Serial3.print(a[1]);
-  Serial3.print("\t");
-  Serial3.println(a[6]);
+// Serial3.print(a[0]);
+//  Serial3.print("\t");
+//  Serial3.print(a[1]);
+//  Serial3.print("\t");
+//  Serial3.println(a[6]);
  
  /* making sure that the neighbours' positions are not zero, as a signal to start*/
  if(a[6] == 1)
@@ -224,13 +239,14 @@ void rendezvousWithCamera()
    
    if(vel < 0.2) vel = 0;
    
-   Serial.print(theta);
-   Serial.print("\t");
-   Serial.println(vel);
+   Serial3.print(theta);
+   Serial3.print("\t");
+   Serial3.println(vel);
    Bot.controlBot(vel,theta,'h');
  }
  else
  {
+  Bot.keepIMUBusy();
   Bot.stopRover();
  }
 }

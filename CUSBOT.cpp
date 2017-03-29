@@ -34,7 +34,8 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   RPMLeftReq = 0;
   RPMRightReq = 0;
   interWheelLength = 0.18;
-  wheelRadius = 0.0692*0.375;
+//  wheelRadius = 0.0692*0.375;
+  wheelRadius = 0.0633*0.5;
   vReq = 0;
   omegaReq = 0;
   headingReq = 0;
@@ -162,6 +163,207 @@ void CUSBOT::espMqttTest()
 //    Serial.print("\t");
     Serial.println(esp.messageI[2]*10);
   }
+}
+void CUSBOT::parameterEstimationTest()
+{
+  /*
+   * Here we give the motors the order to run at 
+   * full speed, then the master takes the speed
+   * readings from the slaves and sends it to screen
+   * with the electric current readings. This data 
+   * is processed later to estimate motor parameters.
+   */
+  byte message[3] = {0,0,5};
+  char a = 0;
+  const int ttsize = 1;
+  int timeTable[ttsize] = {5};
+  int waitTime[ttsize] = {1};
+  static float oldTimeParId = 0;
+  static float timeBroadcast = 0;
+  bool waitFlag = true;
+  float input = 0;
+  float t = (float)millis()/1000.0 - tStart;
+  
+  for(int i = 0; i < ttsize; i++)
+  {
+    while(waitFlag)
+    {
+      t = (float)millis()/1000.0 - tStart;
+      if(t - oldTimeParId < waitTime[i] && waitFlag)
+      {
+        stopRover();
+        float currentRight = (float)analogRead(A3)*5/1023.0/0.52;
+        float currentLeft = (float)analogRead(A4)*5/1023.0/0.52;
+        estimatePosition();
+        input = 0;
+        if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+        {
+          motorLeft.updateRPM_filtered();
+          motorRight.updateRPM_filtered();
+        }
+        if(t - timeBroadcast > 0.05)
+        {
+          Serial3.print(t);
+          Serial3.print("\t");
+          Serial3.print(xPos);
+          Serial3.print("\t");
+          Serial3.println(yPos);
+          timeBroadcast = t;
+        }
+      }
+      else
+      {
+        waitFlag = false;
+        oldTimeParId = t;
+      }
+    }
+
+    while(!waitFlag)
+    {
+      t = (float)millis()/1000.0 - tStart;
+      if(t - oldTimeParId < timeTable[i] && !waitFlag)
+      {
+        Wire.beginTransmission(5);
+        Wire.write(message,3);
+        Wire.endTransmission();
+  
+        Wire.beginTransmission(6);
+        Wire.write(message,3);
+        Wire.endTransmission();
+        
+        float currentRight = (float)analogRead(A3)*5/1023.0/0.52;
+        float currentLeft = (float)analogRead(A4)*5/1023.0/0.52;
+        estimatePosition();
+        input = (float)analogRead(A0)*5/1023.0 *2.97; //reading the battery voltage, as it is the input to the motors.
+        if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+        {
+          motorLeft.updateRPM_filtered();
+          motorRight.updateRPM_filtered();
+        }
+        if(t - timeBroadcast > 0.05)
+        {
+          Serial3.print(t);
+          Serial3.print("\t");
+          Serial3.print(xPos);
+          Serial3.print("\t");
+          Serial3.println(yPos);
+          timeBroadcast = t;
+        }
+      }
+      else
+      {
+        waitFlag = true;
+        oldTimeParId = t;
+      }
+    }
+  }
+  stopRover();  
+}
+
+void CUSBOT::parameterEstimationTest2()
+{
+  /*
+   * Here we give the motors the order to run at 
+   * full speed, then the master takes the speed
+   * readings from the slaves and sends it to screen
+   * with the electric current readings. This data 
+   * is processed later to estimate motor parameters.
+   */
+  byte message[3] = {0,0,5};
+  char a = 0;
+  const int ttsize = 1;
+  int timeTable[ttsize] = {5};
+  int waitTime[ttsize] = {1};
+  static float oldTimeParId = 0;
+  static float timeBroadcast = 0;
+  bool waitFlag = true;
+  float input = 0;
+  float t = (float)millis()/1000.0 - tStart;
+  
+  for(int i = 0; i < ttsize; i++)
+  {
+    while(waitFlag)
+    {
+      t = (float)millis()/1000.0 - tStart;
+      if(t - oldTimeParId < waitTime[i] && waitFlag)
+      {
+        stopRover();
+        float currentRight = (float)analogRead(A3)*5/1023.0/0.52;
+        float currentLeft = (float)analogRead(A4)*5/1023.0/0.52;
+        input = 0;
+        if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+        {
+          motorLeft.updateRPM_filtered();
+          motorRight.updateRPM_filtered();
+        }
+        if(t - timeBroadcast > 0.05)
+        {
+          Serial3.print(t);
+          Serial3.print("\t");
+          Serial3.print(motorRight.FilteredRPM);
+          Serial3.print("\t");
+          Serial3.print(currentRight);
+          Serial3.print("\t");
+          Serial3.print(motorLeft.FilteredRPM);
+          Serial3.print("\t");
+          Serial3.print(currentLeft);
+          Serial3.print("\t");
+          Serial3.println(input); 
+          timeBroadcast = t;
+        }
+      }
+      else
+      {
+        waitFlag = false;
+        oldTimeParId = t;
+      }
+    }
+
+    while(!waitFlag)
+    {
+      t = (float)millis()/1000.0 - tStart;
+      if(t - oldTimeParId < timeTable[i] && !waitFlag)
+      {
+        Wire.beginTransmission(5);
+        Wire.write(message,3);
+        Wire.endTransmission();
+  
+        Wire.beginTransmission(6);
+        Wire.write(message,3);
+        Wire.endTransmission();
+        
+        float currentRight = (float)analogRead(A3)*5/1023.0/0.52;
+        float currentLeft = (float)analogRead(A4)*5/1023.0/0.52;
+        input = (float)analogRead(A0)*5/1023.0 *2.97; //reading the battery voltage, as it is the input to the motors.
+        if(ACTIVATE_SLAVE_MOTOR_CONTROL)
+        {
+          motorLeft.updateRPM_filtered();
+          motorRight.updateRPM_filtered();
+        }
+        if(t - timeBroadcast > 0.05)
+        {
+          Serial3.print(t);
+          Serial3.print("\t");
+          Serial3.print(motorRight.FilteredRPM);
+          Serial3.print("\t");
+          Serial3.print(currentRight);
+          Serial3.print("\t");
+          Serial3.print(motorLeft.FilteredRPM);
+          Serial3.print("\t");
+          Serial3.print(currentLeft);
+          Serial3.print("\t");
+          Serial3.println(input); 
+          timeBroadcast = t;
+        }
+      }
+      else
+      {
+        waitFlag = true;
+        oldTimeParId = t;
+      }
+    }
+  }
+  stopRover();  
 }
 
 void CUSBOT:: updateNeighboursPos()
@@ -672,7 +874,7 @@ float CUSBOT::headingController()
   float error = 0;
   int complementary_error = 0;
   int new_yaw = mpu.get_yaw();
-  Serial.println(new_yaw);
+//  Serial3.println(new_yaw);
 
   // making some operations on the obtained yaw reading to make sure it is useful and sound
   if(new_yaw < 0)
@@ -770,7 +972,7 @@ float CUSBOT::headingController2()
 //  Serial.print("\t");
 //  Serial2.print(biasedHeading);
 //  Serial2.print("\t");
-//  Serial2.println(new_yaw);
+//  Serial3.println(new_yaw);
   float complementary = 0;
   float desiredLocal = 0;
   //******* calculating the required direction as seen by the robot
@@ -908,7 +1110,7 @@ void CUSBOT::stopRover()
 {
   /*
    * Now notice that the codes in the master and slave units are designed 
-   * in way that it has a certain cnovention: when messsge[2] = 0; this means
+   * in way that it has a certain convention: when messsge[2] = 0; this means
    * normal operation, =1 means reverse rotation direction while =2 means 
    * stop completely.
    */
