@@ -14,6 +14,7 @@
 class CUSBOT{
   
   public:
+  CUSBOT(int);
   CUSBOT(int,int,int,int,int,int); //constructor
   void controlBot(float,float,char); //controls linear and angular speeds
   void IMU_init(); //or else, the code hangs. See implementation for more details
@@ -67,6 +68,7 @@ class CUSBOT{
   #endif
   
   //variables
+  int roverIndex;
   float vLeftReq;
   float vRightReq;
   float RPMLeftReq;

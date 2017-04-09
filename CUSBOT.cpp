@@ -77,6 +77,75 @@ CUSBOT::CUSBOT(int _inA1, int _inA2, int _EA, int _inB1, int _inB2, int _EB):mot
   oldVelocity = 0;
 }
 
+CUSBOT::CUSBOT(int a):motorLeft(6, 2),motorRight(5, 7) //for motorHandler, the first arguement is the address of the slave responsible for measuring speed, and the second is the port of PWM output
+{
+  roverIndex = a;
+  inA1 = 3;
+  inA2 = 4;
+  EA = 2;
+  inB1 = 5;
+  inB2 = 6;
+  EB = 7;
+  pinMode(inA1,OUTPUT);
+  pinMode(inA2,OUTPUT);
+  pinMode(EA,OUTPUT);
+  pinMode(inB1,OUTPUT);
+  pinMode(inB2,OUTPUT);
+  pinMode(EB,OUTPUT);
+  
+  digitalWrite(inA1,HIGH);
+  digitalWrite(inA2,LOW);
+  digitalWrite(inB1,HIGH);
+  digitalWrite(inB2,LOW);
+  // variables initializations
+  vLeftReq = 0;
+  vRightReq = 0;
+  RPMLeftReq = 0;
+  RPMRightReq = 0;
+  interWheelLength = 0.18;
+//  wheelRadius = 0.0692*0.375;
+  wheelRadius = 0.0633*0.5;
+  vReq = 0;
+  omegaReq = 0;
+  headingReq = 0;
+  oldTimeu = 0;
+  batonFlag = false;
+  
+  // variables initialization for velocity control function
+  int i = 0;
+  for(i = 0; i < 2; i++)
+  {
+    velocityErrorIntegral[i] = 0;
+    velocityErrorHistory[i] = 0;    
+  }
+  velocityErrorDifferential = 0;
+  velTimeOldv = 0;
+  
+  //variables initialization for angular velocity control function
+  for(i = 0; i < 2; i++)
+  {
+    omegaErrorIntegral[i] = 0;
+    omegaErrorHistory[i] = 0;
+  }
+  omegaErrorDifferential = 0;
+  velTimeOldo = 0;
+
+  //variables initialization for heading angle control function
+  for(i = 0; i < 2; i++)
+  {
+    headingErrorIntegral[i] = 0;
+    headingErrorHistory[i] = 0;
+  }
+  headingErrorDifferential = 0;
+  velTimeOldh = 0;
+  initialHeading = 0;
+
+  //variables for the distnace estimation function
+  distanceCovered = 0;
+  oldTimePos = 0;
+  oldVelocity = 0;
+}
+
 void CUSBOT::keepIMUBusy()
 {
   int new_yaw = mpu.get_yaw();
@@ -729,7 +798,7 @@ void CUSBOT::IMU_settle()
   while(!yaw_settled && !IMU_ok_flag)
   {
     new_yaw = mpu.get_yaw();
-    Serial.println(new_yaw);
+//    Serial3.println(new_yaw);
     if(new_yaw == old_yaw)
     {
       number_of_repeatings++; //here, we count how many times a certain reading is repaeated in the transient state of the sensor till it settles 
