@@ -100,7 +100,7 @@ void doubleIntegratorPointDynamics::rendezvousHTTP()
  xddot = 0;
  yddot = 0;
  Bot.estimatePosition(); //tries to figure out where we are
- Bot.updatePositionsHTTP(); //tries to fgiure out where the neighbours are
+ Bot.updatePositionsHTTP('n'); //tries to fgiure out where the neighbours are
  Bot.getPositions(a);  //just returns the positions. 
  /* making sure that the neighbours' positions are not zero, as a signal to start*/
  if((int)a[6] == 1)
@@ -187,7 +187,7 @@ void doubleIntegratorPointDynamics::formationHTTP()
  ydot = 0;
  
  Bot.estimatePosition(); //tries to figure out where we are
- Bot.updatePositionsHTTP(); //tries to fgiure out where the neighbours are
+ Bot.updatePositionsHTTP('n'); //tries to fgiure out where the neighbours are
  Bot.getPositions(a);  //just returns the positions.
  
  /* making sure that the neighbours' positions are not zero, as a signal to start*/

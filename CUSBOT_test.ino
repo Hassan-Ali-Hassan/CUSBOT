@@ -1,6 +1,6 @@
 #include<Wire.h> 
 
-#define AGENT 3
+#define AGENT 2
 //#define TEST  /*This variables is defined when there is a need to perform tests directly on the rover (to test a new feature or debug some problem)*/
 #define SINGLE/* This is for testing rendezvous and formations with control laws based on single integrator point mass*/
 //#define DOUBLE/* This is for testing rendezvous and formations with control laws based on double integrator point mass*/
@@ -103,7 +103,8 @@ void loop()
 
   #ifdef SINGLE
 //  sBot.rendezvousHTTP();
-  sBot.formationHTTP();
+//  sBot.formationHTTP();
+  sBot.consensusHTTP();
 //  sBot.formationMQTT();
 //  sBot.rendezvousMQTT();
   #endif

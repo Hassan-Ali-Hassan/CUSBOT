@@ -697,9 +697,23 @@ void CUSBOT:: updatePositions3()
   Serial.println();
 }
 
-void CUSBOT::updatePositionsHTTP()
+void CUSBOT:: manipulatePosition(float a,float b)
 {
-  String outS = String((int)(xPos*100))+","+String((int)(yPos*100)); //note that the ESP modules are currently accosumed to sending positions in cm (they are not prepared to handle dicimal points)
+  xPosToTarget = xPos - a;
+  yPosToTarget = yPos - b;
+}
+
+void CUSBOT::updatePositionsHTTP(char c)//the character c is used as a selector character to select among several functionalities; if c == 'f', the position values are modified so the difference between current and desired psoition is broadcasted, while if c=='r', then the normal position is sent to other agents.
+{
+  String outS;
+  if (c == 'f') //formation specific
+  {
+    outS = String((int)(xPosToTarget*100))+","+String((int)(yPosToTarget*100)); //note that the ESP modules are currently accosumed to sending positions in cm (they are not prepared to handle dicimal points)
+  }
+  else //normal
+  {
+    outS = String((int)(xPos*100))+","+String((int)(yPos*100)); //note that the ESP modules are currently accosumed to sending positions in cm (they are not prepared to handle dicimal points)
+  }
   String in;
   char a;
   int index = 0;

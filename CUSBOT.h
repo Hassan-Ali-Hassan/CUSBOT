@@ -31,9 +31,10 @@ class CUSBOT{
   void updatePositions();
   void updatePositions2();
   void updatePositions3();
-  void updatePositionsHTTP();
+  void updatePositionsHTTP(char);
   void estimatePosition();
   void estimatePosition2();
+  void manipulatePosition(float,float); //this function is useful when formation based on shape based control is required (see Egerstedt book page 127)
   float estimateDistance();
   float getStartingTime();
   
@@ -128,6 +129,8 @@ class CUSBOT{
   float oldVelocity;
   float xPos;
   float yPos;
+  float xPosToTarget;
+  float yPosToTarget;
   int x_init;
   int y_init;
   

@@ -13,12 +13,14 @@ class singleIntegratorPointDynamics{
   void rendezvousHTTP();
   void formationMQTT();
   void formationHTTP();
+  void consensusHTTP();
   
   protected:
   CUSBOT Bot;
   int index;
   int numOfNeighbours;
   float zref[4];
+  float target[2];
   float xdot;
   float ydot;
   float a[7];
